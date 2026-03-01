@@ -1,0 +1,229 @@
+# Kubernetes Guide
+
+PulseBoard runs natively on Kubernetes with read-only RBAC, namespace filtering, and workload-level monitoring out of the box.
+
+---
+
+## Deployment
+
+Apply the provided manifests:
+
+```bash
+kubectl create namespace pulseboard
+kubectl apply -f deploy/kubernetes/
+```
+
+This creates:
+
+| Resource | Description |
+|----------|-------------|
+| **ServiceAccount** | `pulseboard` — identity for API access |
+| **ClusterRole** | Read-only access to pods, logs, services, events, workloads, and metrics |
+| **ClusterRoleBinding** | Binds the role to the service account |
+| **Deployment** | Single replica with security hardening |
+| **PersistentVolumeClaim** | 1 Gi for SQLite storage |
+| **Service** | ClusterIP on port 80 |
+
+---
+
+## RBAC Permissions
+
+PulseBoard requests the minimum permissions needed for monitoring:
+
+```yaml
+rules:
+  # Core resources — read-only
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "namespaces", "events"]
+    verbs: ["get", "list", "watch"]
+  # Workloads — read-only
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  # Metrics — read-only
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+```
+
+PulseBoard never creates, modifies, or deletes any resource in your cluster.
+
+!!! info "Metrics Server required"
+    Resource metrics (CPU/memory) require [metrics-server](https://github.com/kubernetes-sigs/metrics-server)
+    to be installed in the cluster. Container monitoring works without it.
+
+---
+
+## Security Hardening
+
+The default deployment includes:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  fsGroup: 65534
+containers:
+  - securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+```
+
+A `/tmp` emptyDir is mounted for SQLite WAL temporary files since the root filesystem is read-only.
+
+---
+
+## Namespace Filtering
+
+By default, PulseBoard monitors all namespaces. Use environment variables to restrict scope:
+
+### Allowlist
+
+Only monitor specific namespaces:
+
+```yaml
+env:
+  - name: PULSEBOARD_K8S_NAMESPACES
+    value: "default,production,staging"
+```
+
+### Blocklist
+
+Monitor all namespaces except specific ones:
+
+```yaml
+env:
+  - name: PULSEBOARD_K8S_EXCLUDE_NAMESPACES
+    value: "kube-system,kube-public,cert-manager"
+```
+
+!!! tip "System namespaces"
+    `kube-system` and `kube-public` are excluded by default when using the blocklist.
+    You do not need to add them explicitly.
+
+If both `PULSEBOARD_K8S_NAMESPACES` and `PULSEBOARD_K8S_EXCLUDE_NAMESPACES` are set, the allowlist takes precedence.
+
+---
+
+## Workload Monitoring
+
+PulseBoard groups pods by their owning workload:
+
+| Workload | What PulseBoard tracks |
+|----------|----------------------|
+| **Deployment** | Replica count, ready pods, rollout status |
+| **StatefulSet** | Ordered pod states, persistent volume claims |
+| **DaemonSet** | Node coverage, desired vs ready counts |
+
+Each workload appears as a single entry in the dashboard with aggregated health status. Individual pods are accessible in the detail view.
+
+---
+
+## Runtime Detection
+
+PulseBoard auto-detects Kubernetes in this order:
+
+1. `PULSEBOARD_RUNTIME=kubernetes` environment variable (explicit override)
+2. `KUBERNETES_SERVICE_HOST` environment variable (set automatically by Kubernetes for in-cluster pods)
+3. `KUBECONFIG` environment variable or `~/.kube/config` file (for out-of-cluster development)
+
+To force Kubernetes mode:
+
+```yaml
+env:
+  - name: PULSEBOARD_RUNTIME
+    value: "kubernetes"
+```
+
+---
+
+## Health Probes
+
+The deployment includes liveness and readiness probes:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 30
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 10
+```
+
+---
+
+## Resource Limits
+
+Default resource requests and limits:
+
+```yaml
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+```
+
+Adjust based on the number of monitored workloads. PulseBoard is lightweight — 50-100 workloads run comfortably within these limits.
+
+---
+
+## Scaling Considerations
+
+!!! warning "Single replica only"
+    PulseBoard uses SQLite with a single-writer pattern. The deployment strategy is set to
+    `Recreate` — do not scale beyond 1 replica.
+
+For high availability, ensure your PersistentVolumeClaim uses a storage class with adequate durability.
+
+---
+
+## Exposing the Dashboard
+
+### Ingress
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pulseboard
+  namespace: pulseboard
+spec:
+  rules:
+    - host: pulse.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pulseboard
+                port:
+                  name: http
+```
+
+### Port Forward (Development)
+
+```bash
+kubectl port-forward -n pulseboard svc/pulseboard 8080:80
+```
+
+Open **http://localhost:8080**.
+
+---
+
+## Related
+
+- [Installation](../getting-started/installation.md) — Docker and source builds
+- [Configuration](../getting-started/configuration.md) — Environment variables
+- [Container Monitoring](../features/containers.md) — How workloads are tracked
+- [Resource Metrics](../features/resources.md) — CPU/memory from metrics-server

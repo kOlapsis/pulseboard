@@ -3,12 +3,12 @@
 *.test
 *.out
 vendor/
-backend/tmp/
+tmp/
 
 # Node.js / Frontend
 node_modules/
 dist/
-!backend/cmd/pulseboard/web/dist/.gitkeep
+!cmd/pulseboard/web/dist/.gitkeep
 frontend/dist/
 *.log
 
@@ -37,8 +37,11 @@ Thumbs.db
 coverage/
 *.coverprofile
 
+# MkDocs
+site/
+
 # Build output
-backend/pulseboard
+pulseboard
 CLAUDE.md
 .claude/
 pulseboard-*.md

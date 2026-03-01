@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="PulseBoard" width="120" />
+  <img src="./docs/pulseboard-hero.png" alt="PulseBoard — Unified monitoring" />
 </p>
 
 <h1 align="center">PulseBoard</h1>
@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="#features">Features</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="#configuration">Configuration</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="#api">API</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+  <a href="#quick-start">Quick Start</a>  |  
+  <a href="#features">Features</a>  |  
+  <a href="#configuration">Configuration</a>  |  
+  <a href="#api">API</a>  |  
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -31,18 +31,18 @@
 
 Most self-hosters juggle 3-5 tools to monitor their stack: one for containers, one for uptime, one for certs, one for metrics, and yet another for a status page. PulseBoard replaces all of them.
 
-| | PulseBoard | Uptime Kuma | Portainer | Dozzle |
-|---|:---:|:---:|:---:|:---:|
-| Container auto-discovery | **Yes** | No | Yes | Yes |
-| HTTP/TCP endpoint checks | **Yes** | Yes | No | No |
-| Cron/heartbeat monitoring | **Yes** | Yes | No | No |
-| SSL certificate tracking | **Yes** | Yes | No | No |
-| CPU/memory/network metrics | **Yes** | No | Limited | No |
-| Image update & CVE detection | **Yes** | No | Yes | No |
-| Public status page | **Yes** | Yes | No | No |
-| Alerting (webhook + SMTP) | **Yes** | Yes | Limited | No |
-| Kubernetes native | **Yes** | No | Yes | No |
-| Single binary, zero deps | **Yes** | Node.js | Docker API | Docker API |
+|                              | PulseBoard | Uptime Kuma | Portainer  | Dozzle     |
+| ---------------------------- |:----------:|:-----------:|:----------:|:----------:|
+| Container auto-discovery     | **Yes**    | No          | Yes        | Yes        |
+| HTTP/TCP endpoint checks     | **Yes**    | Yes         | No         | No         |
+| Cron/heartbeat monitoring    | **Yes**    | Yes         | No         | No         |
+| SSL certificate tracking     | **Yes**    | Yes         | No         | No         |
+| CPU/memory/network metrics   | **Yes**    | No          | Limited    | No         |
+| Image update detection       | **Yes**    | No          | Yes        | No         |
+| Public status page           | **Yes**    | Yes         | No         | No         |
+| Alerting (webhook + SMTP)    | **Yes**    | Yes         | Limited    | No         |
+| Kubernetes native            | **Yes**    | No          | Yes        | No         |
+| Single binary, zero deps     | **Yes**    | Node.js     | Docker API | Docker API |
 
 **One container. One dashboard. Everything monitored.**
 
@@ -89,9 +89,11 @@ PulseBoard auto-detects the in-cluster API. Read-only RBAC, namespace filtering,
 ## Features
 
 ### Container Monitoring
+
 Zero-config auto-discovery for Docker and Kubernetes. Every container is tracked the moment it starts — state changes, health checks, restart loops, log streaming with stdout/stderr demux. Compose projects are auto-grouped. Kubernetes workloads (Deployments, DaemonSets, StatefulSets) are first-class citizens.
 
 ### Endpoint Monitoring
+
 Define HTTP or TCP checks directly as Docker labels — no config files, no UI clicks. PulseBoard picks them up automatically when a container starts. Response times, uptime history, 90-day sparklines, configurable failure/recovery thresholds.
 
 ```yaml
@@ -102,6 +104,7 @@ labels:
 ```
 
 ### Heartbeat & Cron Monitoring
+
 Create a monitor, get a unique URL, add one `curl` to your cron job. PulseBoard tracks start/finish times, durations, exit codes, and alerts you when a job misses its deadline.
 
 ```bash
@@ -110,19 +113,24 @@ curl -fsS -o /dev/null https://pulse.example.com/ping/{uuid}/$?
 ```
 
 ### SSL/TLS Certificate Monitoring
+
 Automatic detection from your HTTPS endpoints, plus standalone monitors for any domain. Alerts at 30, 14, 7, 3, and 1 day before expiry. Full chain validation.
 
 ### Resource Metrics
+
 Real-time CPU, memory, network I/O, and disk I/O per container. Historical charts from 1 hour to 7 days. Per-container alert thresholds with debounce to avoid noise. Top consumers view for instant triage.
 
 ### Update Intelligence
-Knows when your images have updates available. Scans OCI registries, compares digests, resolves changelogs from GitHub Releases, enriches with CVEs from OSV.dev, and scores risk. Stop running `docker pull` blindly.
+
+Knows when your images have updates available. Scans OCI registries, compares digests. Stop running `docker pull` blindly.
 
 ### Alert Engine
+
 Unified alerts across all monitoring sources. Route by severity, source, or entity to specific webhook channels (Slack, Discord, Teams, generic HTTP). Silence rules for planned maintenance. Exponential backoff retry on delivery.
 
 ### Public Status Page
-Give your users a clean, branded status page. Component groups, incident management with timeline updates, scheduled maintenance windows. SMTP subscriber notifications built in.
+
+Give your users a clean status page. Component groups, incident management.
 
 ---
 
@@ -130,14 +138,17 @@ Give your users a clean, branded status page. Component groups, incident managem
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PULSEBOARD_ADDR` | `:8080` | HTTP bind address |
-| `PULSEBOARD_DB` | `./pulseboard.db` | SQLite database path |
-| `PULSEBOARD_BASE_URL` | `http://localhost:8080` | Base URL (used for heartbeat ping URLs) |
-| `PULSEBOARD_RUNTIME` | auto-detect | Force `docker` or `kubernetes` |
-| `PULSEBOARD_K8S_NAMESPACES` | all | Namespace allowlist (comma-separated) |
-| `PULSEBOARD_K8S_EXCLUDE_NAMESPACES` | none | Namespace blocklist |
+| Variable                            | Default                 | Description                                     |
+| ----------------------------------- | ----------------------- | ----------------------------------------------- |
+| `PULSEBOARD_ADDR`                   | `127.0.0.1:8080`        | HTTP bind address                               |
+| `PULSEBOARD_DB`                     | `./pulseboard.db`       | SQLite database path                            |
+| `PULSEBOARD_BASE_URL`               | `http://localhost:8080` | Base URL (used for heartbeat ping URLs)         |
+| `PULSEBOARD_CORS_ORIGINS`           | same-origin             | CORS allowed origins (comma-separated)          |
+| `PULSEBOARD_RUNTIME`                | auto-detect             | Force `docker` or `kubernetes`                  |
+| `PULSEBOARD_MAX_BODY_SIZE`          | `1048576`               | Max request body size in bytes (1 MB)           |
+| `PULSEBOARD_UPDATE_INTERVAL`        | `24h`                   | Update intelligence scan interval (Go duration) |
+| `PULSEBOARD_K8S_NAMESPACES`         | all                     | Namespace allowlist (comma-separated)           |
+| `PULSEBOARD_K8S_EXCLUDE_NAMESPACES` | none                    | Namespace blocklist                             |
 
 ### Docker Labels Reference
 
@@ -152,6 +163,7 @@ labels:
   pulseboard.alert.restart_threshold: "5"      # Restart loop threshold
   pulseboard.alert.channels: "slack,email"     # Route to specific channels
 ```
+
 </details>
 
 <details>
@@ -173,9 +185,22 @@ labels:
   pulseboard.endpoint.http.method: "POST"
   pulseboard.endpoint.http.expected-status: "200,201"
   pulseboard.endpoint.http.tls-verify: "false"
+  pulseboard.endpoint.http.headers: '{"Authorization":"Bearer tok"}' # or key=val,key=val
+  pulseboard.endpoint.http.max-redirects: "3"
   pulseboard.endpoint.failure-threshold: "3"
   pulseboard.endpoint.recovery-threshold: "2"
 ```
+
+</details>
+
+<details>
+<summary><strong>TLS certificate monitoring</strong></summary>
+
+```yaml
+labels:
+  pulseboard.tls.certificates: "example.com:443,api.example.com:443"  # Explicit TLS targets
+```
+
 </details>
 
 <details>
@@ -216,6 +241,7 @@ services:
 volumes:
   pulseboard-data:
 ```
+
 </details>
 
 ---
@@ -250,6 +276,7 @@ services:
       PULSEBOARD_DB: "/data/pulseboard.db"
       PULSEBOARD_BASE_URL: "https://pulse.example.com"
 ```
+
 </details>
 
 > **Note:** `/ping/{uuid}` (heartbeat pings) and `/status/` (public status page) are meant to be publicly accessible. Configure your proxy rules accordingly.
@@ -258,16 +285,16 @@ services:
 
 ## Alert Sources
 
-| Source | Events | Default Severity |
-|--------|--------|------------------|
-| Container | `restart_loop`, `health_unhealthy` | Warning |
-| Endpoint | `consecutive_failure` | Critical |
-| Heartbeat | `deadline_missed` | Critical |
-| Certificate | `expiring`, `expired`, `chain_invalid` | Critical |
-| Resource | `cpu_threshold`, `memory_threshold` | Warning |
-| Update | `available`, `cve_detected` | Info / CVSS-based |
+| Source      | Events                                 | Default Severity  |
+| ----------- | -------------------------------------- | ----------------- |
+| Container   | `restart_loop`, `health_unhealthy`     | Warning           |
+| Endpoint    | `consecutive_failure`                  | Critical          |
+| Heartbeat   | `deadline_missed`                      | Critical          |
+| Certificate | `expiring`, `expired`, `chain_invalid` | Critical          |
+| Resource    | `cpu_threshold`, `memory_threshold`    | Warning           |
+| Update      | `available`                            | Info              |
 
-Deliver to Slack, Discord, Teams, or any HTTP endpoint. SMTP for status page subscribers.
+Deliver to Slack, Discord, Teams, or any HTTP endpoint.
 
 ---
 
@@ -278,19 +305,19 @@ Full REST API under `/api/v1/` for automation and integration.
 <details>
 <summary><strong>Endpoint reference</strong></summary>
 
-| Resource | Endpoints |
-|----------|-----------|
-| Containers | `GET /containers` `GET /containers/{id}` `GET /containers/{id}/transitions` `GET /containers/{id}/logs` |
-| Endpoints | `GET /endpoints` `GET /endpoints/{id}` `GET /endpoints/{id}/checks` `GET /endpoints/{id}/uptime/daily` |
-| Heartbeats | `GET POST /heartbeats` `GET PUT DELETE /heartbeats/{id}` `POST /heartbeats/{id}/pause\|resume` |
-| Certificates | `GET POST /certificates` `GET PUT DELETE /certificates/{id}` |
-| Resources | `GET /containers/{id}/resources/current\|history` `GET /resources/summary\|top` |
-| Alerts | `GET /alerts` `GET /alerts/active` `GET POST /channels` `GET POST /silence` |
-| Webhooks | `GET POST /webhooks` `POST /webhooks/{id}/test` |
-| Status Page | `GET POST /status/groups\|components\|incidents\|maintenance` |
-| Updates | `GET /updates` `POST /updates/scan` `GET /cve` `GET /risk` |
-| Events | `GET /containers/events` *(SSE stream)* |
-| Health | `GET /health` |
+| Resource     | Endpoints                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| Containers   | `GET /containers` `GET /containers/{id}` `GET /containers/{id}/transitions` `GET /containers/{id}/logs` |
+| Endpoints    | `GET /endpoints` `GET /endpoints/{id}` `GET /endpoints/{id}/checks` `GET /endpoints/{id}/uptime/daily`  |
+| Heartbeats   | `GET POST /heartbeats` `GET PUT DELETE /heartbeats/{id}` `POST /heartbeats/{id}/pause\|resume`          |
+| Certificates | `GET POST /certificates` `GET PUT DELETE /certificates/{id}`                                            |
+| Resources    | `GET /containers/{id}/resources/current\|history` `GET /resources/summary\|top`                         |
+| Alerts       | `GET /alerts` `GET /alerts/active` `GET POST /channels` `GET POST /silence`                             |
+| Webhooks     | `GET POST /webhooks` `POST /webhooks/{id}/test`                                                         |
+| Status Page  | `GET POST /status/groups\|components\|incidents\|maintenance`                                           |
+| Updates      | `GET /updates` `POST /updates/scan`                                                                     |
+| Events       | `GET /containers/events` *(SSE stream)*                                                                 |
+| Health       | `GET /health`                                                                                           |
 
 </details>
 
@@ -330,6 +357,7 @@ Full REST API under `/api/v1/` for automation and integration.
 ```
 
 **Design philosophy:**
+
 - **Single binary** — Frontend embedded in Go via `embed.FS`. One file to deploy.
 - **Zero dependencies** — SQLite is the only database. No Redis, no Postgres, no message queue.
 - **Real-time by default** — SSE pushes every state change to the browser instantly.
@@ -346,10 +374,10 @@ Full REST API under `/api/v1/` for automation and integration.
 cd frontend && npm install && npm run build
 
 # Backend (embeds frontend dist/)
-cd backend && go build -o pulseboard ./cmd/pulseboard
+go build -o pulseboard ./cmd/pulseboard
 
 # Run
-./backend/pulseboard
+./pulseboard
 ```
 
 **Requirements:** Go >= 1.25 · Node.js >= 20 · CGO enabled · Docker (for testing)
@@ -358,30 +386,30 @@ cd backend && go build -o pulseboard ./cmd/pulseboard
 <summary><strong>Project structure</strong></summary>
 
 ```
-backend/
-  cmd/pulseboard/          Entry point, service wiring
-  internal/
-    api/v1/                HTTP handlers, SSE broker, router
-    container/             Container model, service, uptime
-    docker/                Docker runtime
-    kubernetes/            Kubernetes runtime
-    runtime/               Runtime abstraction interface
-    endpoint/              Endpoint monitoring
-    heartbeat/             Heartbeat/cron monitoring
-    certificate/           TLS certificate monitoring
-    resource/              Resource metrics
-    alert/                 Alert engine, notifier
-    update/                Update intelligence, CVE
-    status/                Public status page
-    webhook/               Webhook dispatcher
-    store/sqlite/          Store layer, migrations, writer
+cmd/pulseboard/            Entry point, service wiring
+internal/
+  api/v1/                  HTTP handlers, SSE broker, router
+  container/               Container model, service, uptime
+  docker/                  Docker runtime
+  kubernetes/              Kubernetes runtime
+  runtime/                 Runtime abstraction interface
+  endpoint/                Endpoint monitoring
+  heartbeat/               Heartbeat/cron monitoring
+  certificate/             TLS certificate monitoring
+  resource/                Resource metrics
+  alert/                   Alert engine, notifier
+  update/                  Update intelligence
+  status/                  Public status page
+  webhook/                 Webhook dispatcher
+  store/sqlite/            Store layer, migrations, writer
 
 frontend/src/
-    pages/                 Vue page components
-    components/            Reusable UI components
-    stores/                Pinia stores (SSE-connected)
-    services/              API client services
+  pages/                   Vue page components
+  components/              Reusable UI components
+  stores/                  Pinia stores (SSE-connected)
+  services/                API client services
 ```
+
 </details>
 
 ---

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { Container } from '@/services/containerApi'
-import { useResourcesStore } from '@/stores/resources'
-import { useUpdatesStore } from '@/stores/updates'
-import { timeAgo } from '@/utils/time'
+import type {Container} from '@/services/containerApi'
+import {useResourcesStore} from '@/stores/resources'
+import {useUpdatesStore} from '@/stores/updates'
+import {timeAgo} from '@/utils/time'
 import UpdateBadge from '@/components/UpdateBadge.vue'
-import { computed } from 'vue'
+import {computed} from 'vue'
 
 const props = defineProps<{
   container: Container
@@ -18,7 +18,7 @@ const resourcesStore = useResourcesStore()
 const updatesStore = useUpdatesStore()
 
 const metrics = computed(() => resourcesStore.formattedSnapshot(props.container.id))
-const containerUpdate = computed(() => updatesStore.updates.find(u => u.container_id === props.container.id) ?? null)
+const containerUpdate = computed(() => updatesStore.updates.find(u => String(u.container_id) === String(props.container.id)) ?? null)
 
 const stateColors: Record<string, { bg: string; text: string }> = {
   running: { bg: 'var(--pb-status-ok-bg)', text: 'var(--pb-status-ok)' },

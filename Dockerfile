@@ -14,10 +14,11 @@ FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /src
-COPY backend/go.mod backend/go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
-COPY backend/ ./
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 COPY --from=spa-builder /src/frontend/dist cmd/pulseboard/web/dist/
 
 ARG VERSION=dev

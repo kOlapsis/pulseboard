@@ -21,6 +21,7 @@ import (
 	"github.com/kolapsis/pulseboard/internal/endpoint"
 	"github.com/kolapsis/pulseboard/internal/heartbeat"
 	_ "github.com/kolapsis/pulseboard/internal/kubernetes"
+	"github.com/kolapsis/pulseboard/internal/ratelimit"
 	"github.com/kolapsis/pulseboard/internal/resource"
 	pbruntime "github.com/kolapsis/pulseboard/internal/runtime"
 	"github.com/kolapsis/pulseboard/internal/status"
@@ -55,9 +56,6 @@ func main() {
 	if k8sExcludeNamespaces != "" {
 		logger.Info("K8s namespace blocklist configured", "exclude_namespaces", k8sExcludeNamespaces)
 	}
-	// Suppress unused warnings — these will be passed to K8s runtime constructor in Phase 5
-	_ = k8sNamespaces
-	_ = k8sExcludeNamespaces
 
 	// Graceful shutdown context
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -489,11 +487,20 @@ func main() {
 		}
 	})
 
+	// --- Rate limiter for public routes ---
+	rl := ratelimit.New(10, 20) // 10 req/s per IP, burst 20
+	go rl.Start(ctx)
+
 	// --- Top-level mux combining admin router, public status page, and SPA ---
 	topMux := http.NewServeMux()
-	statusHandler.Register(topMux)
+
+	statusMux := http.NewServeMux()
+	statusHandler.Register(statusMux)
+	topMux.Handle("/status/", rl.Middleware(statusMux))
+	topMux.Handle("/status", rl.Middleware(statusMux))
+
 	topMux.Handle("/api/", router.Handler())
-	topMux.Handle("/ping/", router.Handler())
+	topMux.Handle("/ping/", rl.Middleware(router.Handler()))
 	topMux.Handle("/", spaHandler(router.Handler(), logger))
 
 	srv := &http.Server{
