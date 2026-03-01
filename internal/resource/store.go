@@ -26,4 +26,12 @@ type ResourceStore interface {
 	UpsertAlertConfig(ctx context.Context, cfg *ResourceAlertConfig) error
 
 	DeleteSnapshotsBefore(ctx context.Context, before time.Time, batchSize int) (int64, error)
+
+	InsertHourlyRollup(ctx context.Context, r *RollupRow) error
+	InsertDailyRollup(ctx context.Context, r *RollupRow) error
+	AggregateHourlyRollup(ctx context.Context, bucketStart, bucketEnd time.Time) error
+	AggregateDailyRollup(ctx context.Context, bucketStart, bucketEnd time.Time) error
+	GetTopConsumersByPeriod(ctx context.Context, metric string, period string, limit int) ([]TopConsumerRow, error)
+	DeleteHourlyBefore(ctx context.Context, before time.Time, batchSize int) (int64, error)
+	DeleteDailyBefore(ctx context.Context, before time.Time, batchSize int) (int64, error)
 }

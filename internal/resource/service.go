@@ -44,6 +44,7 @@ func (s *Service) SetEventCallback(fn EventCallback) {
 // Start begins the resource collection loop. Blocks until ctx is cancelled.
 func (s *Service) Start(ctx context.Context) {
 	s.logger.Info("starting resource collector", "interval", s.collector.interval)
+	go s.startRollupLoop(ctx)
 	s.collector.Start(ctx)
 }
 
@@ -102,6 +103,18 @@ func (s *Service) GetAlertConfig(ctx context.Context, containerID int64) (*Resou
 // UpsertAlertConfig creates or updates alert configuration.
 func (s *Service) UpsertAlertConfig(ctx context.Context, cfg *ResourceAlertConfig) error {
 	return s.store.UpsertAlertConfig(ctx, cfg)
+}
+
+// GetTopConsumersByPeriod returns the top resource consumers averaged over a period.
+func (s *Service) GetTopConsumersByPeriod(ctx context.Context, metric, period string, limit int) ([]TopConsumerRow, error) {
+	rows, err := s.store.GetTopConsumersByPeriod(ctx, metric, period, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get top consumers by period: %w", err)
+	}
+	for i := range rows {
+		rows[i].ContainerName = s.GetContainerName(rows[i].ContainerID)
+	}
+	return rows, nil
 }
 
 func (s *Service) processSnapshot(snap *ResourceSnapshot) {

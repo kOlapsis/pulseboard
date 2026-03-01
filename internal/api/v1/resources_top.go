@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 type ResourceTopService interface {
 	GetAllLatestSnapshots() map[int64]*resource.ResourceSnapshot
 	GetContainerName(containerID int64) string
+	GetTopConsumersByPeriod(ctx context.Context, metric, period string, limit int) ([]resource.TopConsumerRow, error)
 }
 
 // ResourceTopHandler handles top resource consumers endpoints.
@@ -33,7 +35,7 @@ type TopConsumer struct {
 	Rank          int     `json:"rank"`
 }
 
-// HandleGetTopConsumers handles GET /api/v1/resources/top?metric=cpu|memory&limit=5.
+// HandleGetTopConsumers handles GET /api/v1/resources/top?metric=cpu|memory&limit=5&period=1h|24h|7d|30d.
 func (h *ResourceTopHandler) HandleGetTopConsumers(w http.ResponseWriter, r *http.Request) {
 	metric := r.URL.Query().Get("metric")
 	if metric != "cpu" && metric != "memory" {
@@ -51,9 +53,43 @@ func (h *ResourceTopHandler) HandleGetTopConsumers(w http.ResponseWriter, r *htt
 		}
 	}
 
+	period := r.URL.Query().Get("period")
+	if period == "1h" || period == "24h" || period == "7d" || period == "30d" {
+		h.handlePeriodQuery(w, r, metric, period, limit)
+		return
+	}
+
+	h.handleRealtimeQuery(w, metric, limit)
+}
+
+func (h *ResourceTopHandler) handlePeriodQuery(w http.ResponseWriter, r *http.Request, metric, period string, limit int) {
+	rows, err := h.svc.GetTopConsumersByPeriod(r.Context(), metric, period, limit)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to fetch top consumers")
+		return
+	}
+
+	consumers := make([]TopConsumer, 0, len(rows))
+	for i, row := range rows {
+		consumers = append(consumers, TopConsumer{
+			ContainerID:   row.ContainerID,
+			ContainerName: row.ContainerName,
+			Value:         row.AvgValue,
+			Percent:       row.AvgPercent,
+			Rank:          i + 1,
+		})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"metric":    metric,
+		"period":    period,
+		"consumers": consumers,
+	})
+}
+
+func (h *ResourceTopHandler) handleRealtimeQuery(w http.ResponseWriter, metric string, limit int) {
 	all := h.svc.GetAllLatestSnapshots()
 
-	// Build sortable list of consumers.
 	type entry struct {
 		id      int64
 		value   float64
@@ -76,7 +112,6 @@ func (h *ResourceTopHandler) HandleGetTopConsumers(w http.ResponseWriter, r *htt
 		entries = append(entries, entry{id: cID, value: value, percent: pct})
 	}
 
-	// Sort descending by value (for cpu) or percent (for memory).
 	sort.Slice(entries, func(i, j int) bool {
 		if metric == "memory" {
 			return entries[i].percent > entries[j].percent
@@ -84,7 +119,6 @@ func (h *ResourceTopHandler) HandleGetTopConsumers(w http.ResponseWriter, r *htt
 		return entries[i].value > entries[j].value
 	})
 
-	// Take top N.
 	if limit > len(entries) {
 		limit = len(entries)
 	}
@@ -101,7 +135,7 @@ func (h *ResourceTopHandler) HandleGetTopConsumers(w http.ResponseWriter, r *htt
 		})
 	}
 
-	WriteJSON(w, http.StatusOK, map[string]interface{}{
+	WriteJSON(w, http.StatusOK, map[string]any{
 		"metric":    metric,
 		"consumers": consumers,
 	})

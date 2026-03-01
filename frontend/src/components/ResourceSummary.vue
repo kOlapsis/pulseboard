@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useResourcesStore } from '@/stores/resources'
 import { useContainersStore } from '@/stores/containers'
-import TopConsumersWidget, { type TopConsumer } from './TopConsumersWidget.vue'
+import { getTopConsumers } from '@/services/resourceApi'
+import TopConsumersWidget, { type TopConsumer, type Period } from './TopConsumersWidget.vue'
 
 const store = useResourcesStore()
 const containersStore = useContainersStore()
 
 const topMetric = ref<'cpu' | 'memory'>('cpu')
+const topPeriod = ref<Period>('1h')
+const topConsumers = ref<TopConsumer[]>([])
+const loading = ref(false)
 
 const totalMemUsed = computed(() => {
   return Object.values(store.snapshots).reduce((sum, s) => sum + s.mem_used, 0)
@@ -19,32 +23,26 @@ const totalMemLimit = computed(() => {
 
 const containerCount = computed(() => Object.keys(store.snapshots).length)
 
-function containerName(id: number): string {
-  const c = containersStore.activeContainers.find((c) => c.id === id)
-  return c?.name || `#${id}`
+async function fetchTopConsumers() {
+  loading.value = true
+  try {
+    const resp = await getTopConsumers(topMetric.value, topPeriod.value)
+    topConsumers.value = resp.consumers.map((c) => ({
+      containerId: c.container_id,
+      containerName: c.container_name,
+      value: c.value,
+      percent: c.percent,
+      rank: c.rank,
+    }))
+  } catch {
+    topConsumers.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
-const topConsumers = computed<TopConsumer[]>(() => {
-  const entries = Object.entries(store.snapshots)
-  if (entries.length === 0) return []
-
-  const sorted = entries
-    .map(([idStr, snap]) => ({
-      containerId: Number(idStr),
-      containerName: containerName(Number(idStr)),
-      value: topMetric.value === 'cpu' ? snap.cpu_percent : snap.mem_used,
-      percent: topMetric.value === 'cpu'
-        ? snap.cpu_percent
-        : (snap.mem_limit > 0 ? (snap.mem_used / snap.mem_limit) * 100 : 0),
-      rank: 0,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5)
-
-  sorted.forEach((c, i) => { c.rank = i + 1 })
-  return sorted
-})
-
+onMounted(fetchTopConsumers)
+watch([topMetric, topPeriod], fetchTopConsumers)
 </script>
 
 <template>
@@ -69,8 +67,10 @@ const topConsumers = computed<TopConsumer[]>(() => {
       <h4 class="mb-2 text-xs font-semibold" :style="{ color: 'var(--pb-text-secondary)' }">Top Consumers</h4>
       <TopConsumersWidget
         :metric="topMetric"
+        :period="topPeriod"
         :consumers="topConsumers"
         @update:metric="topMetric = $event"
+        @update:period="topPeriod = $event"
       />
     </div>
   </div>

@@ -16,7 +16,9 @@ const (
 	heartbeatPingRetention     = 30 * 24 * time.Hour // 30 days
 	heartbeatExecRetention     = 30 * 24 * time.Hour // 30 days
 	certCheckResultRetention   = 30 * 24 * time.Hour // 30 days
-	resourceSnapshotRetention  = 7 * 24 * time.Hour  // 7 days
+	resourceSnapshotRetention  = 7 * 24 * time.Hour   // 7 days
+	resourceHourlyRetention    = 90 * 24 * time.Hour  // 90 days
+	resourceDailyRetention     = 365 * 24 * time.Hour // 1 year
 )
 
 // StartRetentionCleanup starts a background goroutine that periodically
@@ -122,6 +124,22 @@ func runResourceCleanup(ctx context.Context, store *ResourceStore, logger *slog.
 		logger.Error("retention cleanup: resource snapshots", "error", err)
 	} else if deleted > 0 {
 		logger.Info("retention cleanup: deleted resource snapshots", "count", deleted)
+	}
+
+	hourlyCutoff := time.Now().Add(-resourceHourlyRetention)
+	hourlyDeleted, err := store.DeleteHourlyBefore(ctx, hourlyCutoff, retentionBatchSize)
+	if err != nil {
+		logger.Error("retention cleanup: resource hourly", "error", err)
+	} else if hourlyDeleted > 0 {
+		logger.Info("retention cleanup: deleted resource hourly", "count", hourlyDeleted)
+	}
+
+	dailyCutoff := time.Now().Add(-resourceDailyRetention)
+	dailyDeleted, err := store.DeleteDailyBefore(ctx, dailyCutoff, retentionBatchSize)
+	if err != nil {
+		logger.Error("retention cleanup: resource daily", "error", err)
+	} else if dailyDeleted > 0 {
+		logger.Info("retention cleanup: deleted resource daily", "count", dailyDeleted)
 	}
 }
 

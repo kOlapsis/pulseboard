@@ -40,3 +40,23 @@ type ResourceAlertConfig struct {
 	CreatedAt              time.Time  `json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 }
+
+// RollupRow represents an aggregated resource measurement for a time bucket.
+type RollupRow struct {
+	ContainerID   int64
+	Bucket        time.Time
+	AvgCPUPercent float64
+	AvgMemUsed    int64
+	AvgMemLimit   int64
+	AvgNetRx      int64
+	AvgNetTx      int64
+	SampleCount   int
+}
+
+// TopConsumerRow represents a container's average resource usage over a period.
+type TopConsumerRow struct {
+	ContainerID   int64
+	ContainerName string
+	AvgValue      float64
+	AvgPercent    float64
+}

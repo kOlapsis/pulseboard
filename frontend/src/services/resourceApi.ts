@@ -81,6 +81,24 @@ export function getAlertConfig(containerId: number): Promise<ResourceAlertConfig
   return fetchJSON<ResourceAlertConfig>(`${API_BASE}/containers/${containerId}/resources/alerts`)
 }
 
+export interface TopConsumerApi {
+  container_id: number
+  container_name: string
+  value: number
+  percent: number
+  rank: number
+}
+
+export interface TopConsumerResponse {
+  metric: string
+  period?: string
+  consumers: TopConsumerApi[]
+}
+
+export function getTopConsumers(metric: string, period: string, limit = 5): Promise<TopConsumerResponse> {
+  return fetchJSON<TopConsumerResponse>(`${API_BASE}/resources/top?metric=${metric}&period=${period}&limit=${limit}`)
+}
+
 export function updateAlertConfig(containerId: number, input: UpdateAlertConfigInput): Promise<ResourceAlertConfig> {
   return fetchJSON<ResourceAlertConfig>(`${API_BASE}/containers/${containerId}/resources/alerts`, {
     method: 'PUT',

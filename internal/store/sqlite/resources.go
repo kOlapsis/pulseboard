@@ -185,6 +185,161 @@ func scanAlertConfig(row resourceRowScanner) (*resource.ResourceAlertConfig, err
 	return &cfg, nil
 }
 
+func (s *ResourceStore) InsertHourlyRollup(ctx context.Context, r *resource.RollupRow) error {
+	_, err := s.writer.Exec(ctx,
+		`INSERT OR REPLACE INTO resource_hourly (container_id, bucket, avg_cpu_percent, avg_mem_used, avg_mem_limit, avg_net_rx_bytes, avg_net_tx_bytes, sample_count)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ContainerID, r.Bucket.Unix(), r.AvgCPUPercent, r.AvgMemUsed, r.AvgMemLimit, r.AvgNetRx, r.AvgNetTx, r.SampleCount,
+	)
+	if err != nil {
+		return fmt.Errorf("insert hourly rollup: %w", err)
+	}
+	return nil
+}
+
+func (s *ResourceStore) InsertDailyRollup(ctx context.Context, r *resource.RollupRow) error {
+	_, err := s.writer.Exec(ctx,
+		`INSERT OR REPLACE INTO resource_daily (container_id, bucket, avg_cpu_percent, avg_mem_used, avg_mem_limit, avg_net_rx_bytes, avg_net_tx_bytes, sample_count)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ContainerID, r.Bucket.Unix(), r.AvgCPUPercent, r.AvgMemUsed, r.AvgMemLimit, r.AvgNetRx, r.AvgNetTx, r.SampleCount,
+	)
+	if err != nil {
+		return fmt.Errorf("insert daily rollup: %w", err)
+	}
+	return nil
+}
+
+func (s *ResourceStore) GetTopConsumersByPeriod(ctx context.Context, metric string, period string, limit int) ([]resource.TopConsumerRow, error) {
+	now := time.Now()
+	var query string
+
+	switch period {
+	case "1h":
+		from := now.Add(-1 * time.Hour).Unix()
+		switch metric {
+		case "cpu":
+			query = fmt.Sprintf(
+				`SELECT container_id, AVG(cpu_percent) AS avg_val, AVG(cpu_percent) AS avg_pct
+				FROM resource_snapshots WHERE timestamp >= %d
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
+		case "memory":
+			query = fmt.Sprintf(
+				`SELECT container_id, CAST(AVG(mem_used) AS REAL) AS avg_val,
+					CASE WHEN AVG(mem_limit) > 0 THEN AVG(mem_used) * 100.0 / AVG(mem_limit) ELSE 0 END AS avg_pct
+				FROM resource_snapshots WHERE timestamp >= %d
+				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+		}
+	case "24h":
+		from := now.Add(-24 * time.Hour).Unix()
+		switch metric {
+		case "cpu":
+			query = fmt.Sprintf(
+				`SELECT container_id, AVG(avg_cpu_percent) AS avg_val, AVG(avg_cpu_percent) AS avg_pct
+				FROM resource_hourly WHERE bucket >= %d
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
+		case "memory":
+			query = fmt.Sprintf(
+				`SELECT container_id, CAST(AVG(avg_mem_used) AS REAL) AS avg_val,
+					CASE WHEN AVG(avg_mem_limit) > 0 THEN AVG(avg_mem_used) * 100.0 / AVG(avg_mem_limit) ELSE 0 END AS avg_pct
+				FROM resource_hourly WHERE bucket >= %d
+				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+		}
+	case "7d", "30d":
+		days := 7
+		if period == "30d" {
+			days = 30
+		}
+		from := now.Add(-time.Duration(days) * 24 * time.Hour).Unix()
+		switch metric {
+		case "cpu":
+			query = fmt.Sprintf(
+				`SELECT container_id, AVG(avg_cpu_percent) AS avg_val, AVG(avg_cpu_percent) AS avg_pct
+				FROM resource_daily WHERE bucket >= %d
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
+		case "memory":
+			query = fmt.Sprintf(
+				`SELECT container_id, CAST(AVG(avg_mem_used) AS REAL) AS avg_val,
+					CASE WHEN AVG(avg_mem_limit) > 0 THEN AVG(avg_mem_used) * 100.0 / AVG(avg_mem_limit) ELSE 0 END AS avg_pct
+				FROM resource_daily WHERE bucket >= %d
+				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+		}
+	default:
+		return nil, fmt.Errorf("invalid period: %s", period)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("get top consumers by period: %w", err)
+	}
+	defer rows.Close()
+
+	var result []resource.TopConsumerRow
+	for rows.Next() {
+		var row resource.TopConsumerRow
+		if err := rows.Scan(&row.ContainerID, &row.AvgValue, &row.AvgPercent); err != nil {
+			return nil, fmt.Errorf("scan top consumer row: %w", err)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+func (s *ResourceStore) AggregateHourlyRollup(ctx context.Context, bucketStart, bucketEnd time.Time) error {
+	_, err := s.writer.Exec(ctx,
+		`INSERT OR REPLACE INTO resource_hourly (container_id, bucket, avg_cpu_percent, avg_mem_used, avg_mem_limit, avg_net_rx_bytes, avg_net_tx_bytes, sample_count)
+		SELECT container_id, ? AS bucket,
+			AVG(cpu_percent), CAST(AVG(mem_used) AS INTEGER), CAST(AVG(mem_limit) AS INTEGER),
+			CAST(AVG(net_rx_bytes) AS INTEGER), CAST(AVG(net_tx_bytes) AS INTEGER),
+			COUNT(*)
+		FROM resource_snapshots
+		WHERE timestamp >= ? AND timestamp < ?
+		GROUP BY container_id`,
+		bucketStart.Unix(), bucketStart.Unix(), bucketEnd.Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("aggregate hourly rollup: %w", err)
+	}
+	return nil
+}
+
+func (s *ResourceStore) AggregateDailyRollup(ctx context.Context, bucketStart, bucketEnd time.Time) error {
+	_, err := s.writer.Exec(ctx,
+		`INSERT OR REPLACE INTO resource_daily (container_id, bucket, avg_cpu_percent, avg_mem_used, avg_mem_limit, avg_net_rx_bytes, avg_net_tx_bytes, sample_count)
+		SELECT container_id, ? AS bucket,
+			AVG(avg_cpu_percent), CAST(AVG(avg_mem_used) AS INTEGER), CAST(AVG(avg_mem_limit) AS INTEGER),
+			CAST(AVG(avg_net_rx_bytes) AS INTEGER), CAST(AVG(avg_net_tx_bytes) AS INTEGER),
+			SUM(sample_count)
+		FROM resource_hourly
+		WHERE bucket >= ? AND bucket < ?
+		GROUP BY container_id`,
+		bucketStart.Unix(), bucketStart.Unix(), bucketEnd.Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("aggregate daily rollup: %w", err)
+	}
+	return nil
+}
+
+func (s *ResourceStore) DeleteHourlyBefore(ctx context.Context, before time.Time, batchSize int) (int64, error) {
+	res, err := s.writer.Exec(ctx,
+		`DELETE FROM resource_hourly WHERE id IN (SELECT id FROM resource_hourly WHERE bucket < ? LIMIT ?)`,
+		before.Unix(), batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("delete hourly before: %w", err)
+	}
+	return res.RowsAffected, nil
+}
+
+func (s *ResourceStore) DeleteDailyBefore(ctx context.Context, before time.Time, batchSize int) (int64, error) {
+	res, err := s.writer.Exec(ctx,
+		`DELETE FROM resource_daily WHERE id IN (SELECT id FROM resource_daily WHERE bucket < ? LIMIT ?)`,
+		before.Unix(), batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("delete daily before: %w", err)
+	}
+	return res.RowsAffected, nil
+}
+
 func granularityToSeconds(g resource.Granularity) int64 {
 	switch g {
 	case resource.Granularity1m:

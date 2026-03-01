@@ -427,6 +427,7 @@ func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 				"smtp":                smtpConfigured,
 				"slack":               isEnterprise,
 				"teams":               isEnterprise,
+				"resource_history":    isEnterprise,
 				"alert_escalation":    isEnterprise,
 				"alert_routing":       isEnterprise,
 				"alert_templates":     isEnterprise,

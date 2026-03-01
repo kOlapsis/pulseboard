@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +28,10 @@ func (m *mockResourceTopService) GetContainerName(containerID int64) string {
 		return name
 	}
 	return ""
+}
+
+func (m *mockResourceTopService) GetTopConsumersByPeriod(_ context.Context, _ string, _ string, _ int) ([]resource.TopConsumerRow, error) {
+	return nil, nil
 }
 
 func TestHandleGetTopConsumers(t *testing.T) {
