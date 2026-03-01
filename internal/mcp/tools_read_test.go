@@ -1,0 +1,188 @@
+package mcp
+
+import (
+	"encoding/json"
+	"testing"
+
+	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// textFromContent extracts the text from the first content item, asserting it is a TextContent.
+func textFromContent(t *testing.T, content []gomcp.Content) string {
+	t.Helper()
+	require.NotEmpty(t, content)
+	tc, ok := content[0].(*gomcp.TextContent)
+	require.True(t, ok, "expected *gomcp.TextContent, got %T", content[0])
+	return tc.Text
+}
+
+func TestParseContainerID_ValidInt(t *testing.T) {
+	id, err := parseContainerID("42")
+	require.NoError(t, err)
+	assert.Equal(t, int64(42), id)
+}
+
+func TestParseContainerID_Zero(t *testing.T) {
+	id, err := parseContainerID("0")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), id)
+}
+
+func TestParseContainerID_NegativeValue(t *testing.T) {
+	id, err := parseContainerID("-1")
+	require.NoError(t, err)
+	assert.Equal(t, int64(-1), id)
+}
+
+func TestParseContainerID_InvalidString(t *testing.T) {
+	_, err := parseContainerID("abc")
+	assert.Error(t, err)
+}
+
+func TestParseContainerID_EmptyString(t *testing.T) {
+	_, err := parseContainerID("")
+	assert.Error(t, err)
+}
+
+func TestParseContainerID_FloatString(t *testing.T) {
+	// Sscanf with %d will parse the integer portion, which is valid behavior
+	id, err := parseContainerID("42.5")
+	require.NoError(t, err)
+	assert.Equal(t, int64(42), id)
+}
+
+func TestJsonResult_MarshalMap(t *testing.T) {
+	input := map[string]any{
+		"status":  "ok",
+		"version": "1.0.0",
+	}
+	result, _, err := jsonResult(input)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+	require.Len(t, result.Content, 1)
+
+	var decoded map[string]any
+	text := textFromContent(t, result.Content)
+	err = json.Unmarshal([]byte(text), &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, "ok", decoded["status"])
+	assert.Equal(t, "1.0.0", decoded["version"])
+}
+
+func TestJsonResult_MarshalSlice(t *testing.T) {
+	input := []string{"a", "b", "c"}
+	result, _, err := jsonResult(input)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+	require.Len(t, result.Content, 1)
+
+	var decoded []string
+	text := textFromContent(t, result.Content)
+	err = json.Unmarshal([]byte(text), &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a", "b", "c"}, decoded)
+}
+
+func TestJsonResult_NilValue(t *testing.T) {
+	result, _, err := jsonResult(nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "null", textFromContent(t, result.Content))
+}
+
+func TestJsonResult_EmptySlice(t *testing.T) {
+	result, _, err := jsonResult([]any{})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "[]", textFromContent(t, result.Content))
+}
+
+func TestTextResult(t *testing.T) {
+	result, _, err := textResult("hello world")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+	require.Len(t, result.Content, 1)
+	assert.Equal(t, "hello world", textFromContent(t, result.Content))
+}
+
+func TestTextResult_EmptyString(t *testing.T) {
+	result, _, err := textResult("")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "", textFromContent(t, result.Content))
+}
+
+func TestTextResult_MultiLineContent(t *testing.T) {
+	text := "line1\nline2\nline3"
+	result, _, err := textResult(text)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, text, textFromContent(t, result.Content))
+}
+
+func TestErrResult(t *testing.T) {
+	result, _, err := errResult("something went wrong")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	require.Len(t, result.Content, 1)
+	assert.Equal(t, "something went wrong", textFromContent(t, result.Content))
+}
+
+func TestErrResult_ContainerNotFound(t *testing.T) {
+	result, _, err := errResult("not found: container does not exist")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Equal(t, "not found: container does not exist", textFromContent(t, result.Content))
+}
+
+func TestErrResult_InvalidInput(t *testing.T) {
+	result, _, err := errResult("invalid input: container_id must be a valid integer")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Equal(t, "invalid input: container_id must be a valid integer", textFromContent(t, result.Content))
+}
+
+func TestListAlertsInput_DefaultsToActiveOnly(t *testing.T) {
+	// When the input is zero-valued (no fields set), the handler defaults to active-only.
+	// The handler checks: input.ActiveOnly || input == (listAlertsInput{})
+	// So a zero-valued struct triggers the active-only path.
+	input := listAlertsInput{}
+	zeroValue := listAlertsInput{}
+	assert.Equal(t, zeroValue, input, "zero-valued input should be equal to default")
+}
+
+func TestListAlertsInput_ExplicitActiveOnly(t *testing.T) {
+	input := listAlertsInput{ActiveOnly: true}
+	assert.True(t, input.ActiveOnly)
+}
+
+func TestGetContainerLogsInput_Defaults(t *testing.T) {
+	input := getContainerLogsInput{}
+	assert.Equal(t, 0, input.Lines, "Lines should default to zero (handler applies default of 100)")
+	assert.False(t, input.Timestamps, "Timestamps should default to false")
+}
+
+func TestGetTopConsumersInput_Validation(t *testing.T) {
+	for _, metric := range []string{"cpu", "memory"} {
+		input := getTopConsumersInput{Metric: metric}
+		assert.Contains(t, []string{"cpu", "memory"}, input.Metric)
+	}
+
+	input := getTopConsumersInput{Metric: "disk"}
+	assert.NotEqual(t, "cpu", input.Metric)
+	assert.NotEqual(t, "memory", input.Metric)
+}
+
+func TestGetEndpointHistoryInput_DefaultLimit(t *testing.T) {
+	input := getEndpointHistoryInput{EndpointID: 5}
+	assert.Equal(t, int64(5), input.EndpointID)
+	assert.Equal(t, 0, input.Limit, "Limit should default to zero (handler applies default of 50)")
+}

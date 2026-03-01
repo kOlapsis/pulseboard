@@ -17,6 +17,8 @@ PulseBoard is configured entirely through environment variables. No configuratio
 | `PULSEBOARD_UPDATE_INTERVAL` | `24h` | Update intelligence scan interval. Accepts Go duration format (e.g., `12h`, `30m`). |
 | `PULSEBOARD_K8S_NAMESPACES` | all | Kubernetes namespace allowlist (comma-separated). Empty monitors all namespaces. |
 | `PULSEBOARD_K8S_EXCLUDE_NAMESPACES` | none | Kubernetes namespace blocklist (comma-separated). |
+| `PULSEBOARD_MCP` | `false` | Enable the MCP server on `/mcp` (Streamable HTTP transport). |
+| `PULSEBOARD_MCP_ALLOWED_EMAIL` | — | Restrict MCP access to JWTs matching this email. |
 
 ### Example `.env` File
 
@@ -47,6 +49,10 @@ PULSEBOARD_BASE_URL=https://pulseboard.example.com
 
 # Kubernetes namespaces to exclude (comma-separated)
 # PULSEBOARD_K8S_EXCLUDE_NAMESPACES=kube-system
+
+# MCP Server (Model Context Protocol for AI assistants)
+# PULSEBOARD_MCP=true
+# PULSEBOARD_MCP_ALLOWED_EMAIL=you@example.com
 ```
 
 ---
@@ -94,6 +100,7 @@ Two route prefixes are designed to be publicly accessible and should bypass your
 
 !!! warning "Proxy configuration"
     Make sure your reverse proxy rules allow unauthenticated access to `/ping/` and `/status/` paths.
+    If MCP is enabled, `/mcp` requires long-lived connections (SSE) — disable response buffering and timeouts for this path.
     All other routes (especially `/api/v1/`) should require authentication.
 
 ### Traefik Example: Bypassing Auth for Public Routes

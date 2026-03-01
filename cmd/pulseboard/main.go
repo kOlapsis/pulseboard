@@ -19,8 +19,10 @@ import (
 	"github.com/kolapsis/pulseboard/internal/container"
 	"github.com/kolapsis/pulseboard/internal/docker"
 	"github.com/kolapsis/pulseboard/internal/endpoint"
+	"github.com/kolapsis/pulseboard/internal/extension"
 	"github.com/kolapsis/pulseboard/internal/heartbeat"
 	_ "github.com/kolapsis/pulseboard/internal/kubernetes"
+	pbmcp "github.com/kolapsis/pulseboard/internal/mcp"
 	"github.com/kolapsis/pulseboard/internal/ratelimit"
 	"github.com/kolapsis/pulseboard/internal/resource"
 	pbruntime "github.com/kolapsis/pulseboard/internal/runtime"
@@ -28,6 +30,7 @@ import (
 	"github.com/kolapsis/pulseboard/internal/store/sqlite"
 	"github.com/kolapsis/pulseboard/internal/update"
 	"github.com/kolapsis/pulseboard/internal/webhook"
+	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 var (
@@ -37,8 +40,16 @@ var (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	mcpStdio := len(os.Args) > 1 && os.Args[1] == "--mcp-stdio"
+
+	logLevel := slog.LevelInfo
+	logOutput := os.Stdout
+	if mcpStdio {
+		// In stdio mode, logs go to stderr to keep stdout clean for MCP protocol.
+		logOutput = os.Stderr
+	}
+	logger := slog.New(slog.NewJSONHandler(logOutput, &slog.HandlerOptions{
+		Level: logLevel,
 	}))
 	logger.Info("PulseBoard starting", "version", version, "commit", commit, "build_date", buildDate)
 	v1.SetBuildVersion(version)
@@ -292,6 +303,14 @@ func main() {
 	// Container restart and health alerts
 	svc.SetEventCallback(func(eventType string, data interface{}) {
 		broker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+
+		// Propagate container state/health changes to the public status page.
+		if eventType == "container.state_changed" || eventType == "container.health_changed" {
+			if m, ok := data.(map[string]interface{}); ok {
+				statusSvc.NotifyMonitorChanged(ctx, "container", toInt64(m["id"]))
+			}
+		}
+
 		switch eventType {
 		case "container.restart_alert":
 			if ra, ok := data.(*alert.RestartAlert); ok && ra != nil {
@@ -346,6 +365,9 @@ func main() {
 
 	// Endpoint alerts
 	epSvc.SetAlertCallback(func(ep *endpoint.Endpoint, result endpoint.CheckResult) (string, interface{}) {
+		// Propagate endpoint state changes to the public status page.
+		statusSvc.NotifyMonitorChanged(ctx, "endpoint", ep.ID)
+
 		a := alertDetector.EvaluateCheckResult(ep, result)
 		if a == nil {
 			return "", nil
@@ -405,6 +427,9 @@ func main() {
 
 	// Heartbeat alerts
 	hbSvc.SetAlertCallback(func(h *heartbeat.Heartbeat, alertType string, details map[string]interface{}) {
+		// Propagate heartbeat state changes to the public status page.
+		statusSvc.NotifyMonitorChanged(ctx, "heartbeat", h.ID)
+
 		isRecover := alertType == "recovery"
 		severity := alert.SeverityCritical
 		msg := fmt.Sprintf("Heartbeat '%s' missed deadline", h.Name)
@@ -437,6 +462,12 @@ func main() {
 		if !ok {
 			return
 		}
+
+		// Propagate certificate state changes to the public status page.
+		if eventType == "certificate.alert" || eventType == "certificate.recovery" {
+			statusSvc.NotifyMonitorChanged(ctx, "certificate", toInt64(m["monitor_id"]))
+		}
+
 		switch eventType {
 		case "certificate.alert":
 			certAlertType, _ := m["alert_type"].(string)
@@ -511,6 +542,28 @@ func main() {
 
 	// --- Top-level mux combining admin router, public status page, and SPA ---
 	topMux := http.NewServeMux()
+
+	// MCP Streamable HTTP handler (mcpServer is assigned later, before srv.ListenAndServe)
+	var mcpServer *gomcp.Server
+	mcpEnabled := envOrDefault("PULSEBOARD_MCP", "false")
+	if mcpEnabled == "true" {
+		mcpHTTPHandler := gomcp.NewStreamableHTTPHandler(func(_ *http.Request) *gomcp.Server {
+			return mcpServer
+		}, nil)
+		var mcpHandler http.Handler = mcpHTTPHandler
+		if allowedEmail := os.Getenv("PULSEBOARD_MCP_ALLOWED_EMAIL"); allowedEmail != "" {
+			mcpHandler = pbmcp.AuthMiddleware(allowedEmail, mcpHandler)
+			topMux.Handle("/.well-known/oauth-protected-resource", pbmcp.ProtectedResourceMetadataHandler(
+				fmt.Sprintf("http://%s/mcp", addr),
+			))
+			logger.Info("MCP server enabled with auth", "allowed_email", allowedEmail)
+		} else {
+			logger.Info("MCP server enabled without auth")
+		}
+		mcpHandler = rl.Middleware(mcpHandler)
+		topMux.Handle("/mcp", mcpHandler)
+		topMux.Handle("/mcp/", mcpHandler)
+	}
 
 	statusHandler.Register(topMux, rl.Middleware)
 
@@ -590,6 +643,34 @@ func main() {
 	updateSvc := update.NewService(updateStore, updateScanner, containerAdapter, logger)
 	router.RegisterUpdateRoutes(updateSvc, updateStore)
 	go updateSvc.Start(ctx)
+
+	// --- MCP Server ---
+	mcpSvc := &pbmcp.Services{
+		Containers:   svc,
+		Endpoints:    epSvc,
+		Heartbeats:   hbSvc,
+		Certificates: certSvc,
+		Resources:    resSvc,
+		Alerts:       alertStore,
+		Updates:      updateSvc,
+		Incidents:    extension.NoopIncidentManager{},
+		Maintenance:  extension.NoopMaintenanceScheduler{},
+		Runtime:      rt,
+		LogFetcher:   rt,
+		Version:      version,
+		Logger:       logger.With("component", "mcp"),
+	}
+	mcpServer = pbmcp.NewServer(mcpSvc)
+
+	// MCP stdio mode: run MCP server over stdin/stdout, then exit.
+	if mcpStdio {
+		logger.Info("starting MCP server in stdio mode")
+		if err := mcpServer.Run(ctx, &gomcp.StdioTransport{}); err != nil {
+			logger.Error("MCP stdio server error", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// --- Resource collector ---
 	go resSvc.Start(ctx)
@@ -742,6 +823,10 @@ func spaHandler(apiHandler http.Handler, logger *slog.Logger) http.Handler {
 func isStreamingPath(path string) bool {
 	// Exact matches first.
 	if path == "/api/v1/containers/events" || path == "/status/events" {
+		return true
+	}
+	// MCP Streamable HTTP uses SSE for server-to-client messages.
+	if path == "/mcp" || strings.HasPrefix(path, "/mcp/") {
 		return true
 	}
 	// Log streaming: /api/v1/containers/{id}/logs/stream

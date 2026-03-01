@@ -152,29 +152,37 @@ export const useUpdatesStore = defineStore('updates', () => {
     }
   }
 
-  async function startScan() {
-    try {
-      scanning.value = true
-      await triggerScan()
-      // Poll summary until scan_status changes (fallback if SSE event is missed)
-      const poll = setInterval(async () => {
-        try {
-          const s = await fetchUpdateSummary()
-          if (s.scan_status !== 'running') {
-            scanning.value = false
-            summary.value = s
-            await fetchAllUpdates()
-            clearInterval(poll)
-          }
-        } catch {
-          clearInterval(poll)
+  function pollUntilDone() {
+    const poll = setInterval(async () => {
+      try {
+        const s = await fetchUpdateSummary()
+        if (s.scan_status !== 'running') {
           scanning.value = false
+          summary.value = s
+          await fetchAllUpdates()
+          clearInterval(poll)
         }
-      }, 3000)
-      // Safety timeout — stop polling after 2 minutes
-      setTimeout(() => { clearInterval(poll); scanning.value = false }, 120_000)
-    } catch {
-      scanning.value = false
+      } catch {
+        clearInterval(poll)
+        scanning.value = false
+      }
+    }, 3000)
+    setTimeout(() => { clearInterval(poll); scanning.value = false }, 120_000)
+  }
+
+  async function startScan() {
+    if (scanning.value) return
+    scanning.value = true
+    try {
+      await triggerScan()
+      pollUntilDone()
+    } catch (e) {
+      // 409 = scan already running on the backend — keep scanning state and poll
+      if (e instanceof Error && e.message.includes('already running')) {
+        pollUntilDone()
+      } else {
+        scanning.value = false
+      }
     }
   }
 

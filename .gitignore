@@ -41,7 +41,7 @@ coverage/
 site/
 
 # Build output
-pulseboard
+/pulseboard
 CLAUDE.md
 .claude/
 pulseboard-*.md

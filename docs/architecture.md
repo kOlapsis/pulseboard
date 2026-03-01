@@ -13,6 +13,7 @@
 │                         |                            │
 │   ┌────────────────────────────────────────────┐     │
 │   │           REST API v1 + SSE Broker         │     │
+│   │           MCP Server (stdio + HTTP)        │     │
 │   └────────────────────────────────────────────┘     │
 │          |                          |                │
 │   ┌─────────────┐  ┌──────────────────────┐         │
@@ -65,6 +66,7 @@
 | **`k8s.io/metrics`** | Kubernetes metrics API |
 | **`github.com/mattn/go-sqlite3`** | SQLite driver (CGO) |
 | **`github.com/google/go-containerregistry`** | OCI registry scanning |
+| **`github.com/modelcontextprotocol/go-sdk`** | MCP server (AI assistant integration) |
 | **`embed.FS`** | Frontend embedding |
 
 ### Frontend
@@ -103,6 +105,7 @@ internal/                  Private packages
     resource/              Resource metrics collection
     update/                Update intelligence, registry
     status/                Public status page (handler, templates)
+    mcp/                   MCP server (Model Context Protocol)
     webhook/               Webhook dispatcher
     store/sqlite/          SQLite store layer, migrations, writer
 
