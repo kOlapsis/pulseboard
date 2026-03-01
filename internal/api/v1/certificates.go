@@ -191,7 +191,7 @@ func (h *CertificateHandler) HandleDelete(w http.ResponseWriter, r *http.Request
 		}
 		if errors.Is(err, certificate.ErrCannotDeleteAuto) {
 			WriteError(w, http.StatusBadRequest, "CANNOT_DELETE_AUTO",
-				"Cannot delete auto-detected certificate monitors")
+				"Cannot delete auto-detected certificate monitors; remove the label instead")
 			return
 		}
 		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete certificate monitor")

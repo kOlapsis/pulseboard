@@ -47,6 +47,7 @@ type Service struct {
 	lastScanTime time.Time
 	nextScanTime time.Time
 	scanning     bool
+	appCtx       context.Context // application-scoped context for background scans
 }
 
 // NewService creates the update intelligence service.
@@ -84,6 +85,7 @@ func (s *Service) SetEventCallback(fn EventCallback) {
 
 // Start begins the periodic scan loop. Blocks until ctx is cancelled.
 func (s *Service) Start(ctx context.Context) {
+	s.appCtx = ctx
 	s.logger.Info("starting update intelligence service", "interval", s.interval)
 
 	// Run first scan after a short delay to let containers start
@@ -109,7 +111,9 @@ func (s *Service) Start(ctx context.Context) {
 }
 
 // TriggerScan starts an immediate scan. Returns the scan ID.
-func (s *Service) TriggerScan(ctx context.Context) (int64, error) {
+// The scan runs with the application-scoped context (not the HTTP request context)
+// so it survives after the triggering request completes.
+func (s *Service) TriggerScan(_ context.Context) (int64, error) {
 	s.mu.RLock()
 	if s.scanning {
 		s.mu.RUnlock()
@@ -117,8 +121,11 @@ func (s *Service) TriggerScan(ctx context.Context) (int64, error) {
 	}
 	s.mu.RUnlock()
 
+	ctx := s.appCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	go s.runScan(ctx)
-	// Return a placeholder; the scan record will be created in runScan
 	return 0, nil
 }
 

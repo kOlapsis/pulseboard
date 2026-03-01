@@ -22,7 +22,7 @@ Deploy one container, and PulseBoard auto-discovers your entire stack. Docker or
 - **[TLS Certificate Monitoring](features/certificates.md)** — Auto-detection from HTTPS endpoints. Alerts at 30, 14, 7, 3, and 1 day before expiry. Full chain validation.
 - **[Resource Metrics](features/resources.md)** — CPU, memory, network I/O, disk I/O per container. Historical charts, alert thresholds, top consumers view.
 - **[Update Intelligence](features/updates.md)** — OCI registry scanning, digest comparison. Know when your images have updates available.
-- **[Alert Engine](features/alerts.md)** — Unified alerts across all sources. Webhook channels (Slack, Discord, Teams, generic HTTP). Silence rules, exponential backoff.
+- **[Alert Engine](features/alerts.md)** — Unified alerts across all sources. Webhook and Discord channels. Silence rules, exponential backoff.
 - **[Public Status Page](features/status-page.md)** — Component groups, incident management, scheduled maintenance.
 
 ---
@@ -38,7 +38,7 @@ Deploy one container, and PulseBoard auto-discovers your entire stack. Docker or
 | CPU/memory/network metrics | **Yes** | No | Limited | No |
 | Image update detection | **Yes** | No | Yes | No |
 | Public status page | **Yes** | Yes | No | No |
-| Alerting (webhook + SMTP) | **Yes** | Yes | Limited | No |
+| Alerting (webhook, Discord) | **Yes** | Yes | Limited | No |
 | Kubernetes native | **Yes** | No | Yes | No |
 | Single binary, zero deps | **Yes** | Node.js | Docker API | Docker API |
 

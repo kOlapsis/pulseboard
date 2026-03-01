@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
 import { useEndpointsStore } from '@/stores/endpoints'
+import { useContainersStore } from '@/stores/containers'
 import EndpointCard from '@/components/EndpointCard.vue'
 import { AlertTriangle, Globe } from 'lucide-vue-next'
 
 const store = useEndpointsStore()
+const containers = useContainersStore()
+
+const isK8s = computed(() => containers.runtimeName === 'kubernetes')
+const labelOrAnnotation = computed(() => isK8s.value ? 'annotation' : 'label')
 
 onMounted(() => {
   store.fetchEndpoints()
@@ -105,35 +110,34 @@ onUnmounted(() => {
       {{ store.error }}
     </div>
 
-    <!-- Empty state -->
-    <div
-      v-else-if="store.filteredEndpoints.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-center"
-    >
-      <div class="p-4 bg-slate-900 rounded-2xl mb-4">
-        <Globe :size="48" class="text-slate-600" />
+    <!-- Content area with persistent background hint -->
+    <div v-else class="relative min-h-[300px]">
+      <!-- Background hint — always visible -->
+      <div class="flex flex-col items-center justify-center py-16 text-center">
+        <div class="p-4 bg-slate-900 rounded-2xl mb-4">
+          <Globe :size="48" class="text-slate-600" />
+        </div>
+        <p class="text-sm mb-2 max-w-md text-slate-500">
+          Monitor HTTP and TCP endpoints by adding {{ labelOrAnnotation }}s to your {{ isK8s ? 'pods' : 'containers' }}.
+        </p>
+        <p class="text-sm max-w-md text-slate-500">
+          Add the <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.endpoint.http</code>
+          or <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.endpoint.tcp</code>
+          {{ labelOrAnnotation }} with the target URL.
+        </p>
       </div>
-      <h3 class="text-lg font-semibold text-white mb-1">No endpoints configured</h3>
-      <p class="text-sm mb-2 max-w-md text-slate-500">
-        Monitor HTTP and TCP endpoints by adding Docker labels to your containers.
-      </p>
-      <p class="text-sm max-w-md text-slate-500">
-        Add <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.endpoint.http</code>
-        or <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.endpoint.tcp</code>
-        labels to your containers.
-      </p>
-    </div>
 
-    <!-- Endpoint grid -->
-    <div
-      v-else
-      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <EndpointCard
-        v-for="ep in store.filteredEndpoints"
-        :key="ep.id"
-        :endpoint="ep"
-      />
+      <!-- Endpoint grid — overlays on top -->
+      <div
+        v-if="store.filteredEndpoints.length > 0"
+        class="absolute inset-0 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 content-start bg-[var(--color-slate-950)]"
+      >
+        <EndpointCard
+          v-for="ep in store.filteredEndpoints"
+          :key="ep.id"
+          :endpoint="ep"
+        />
+      </div>
     </div>
   </div>
 </template>

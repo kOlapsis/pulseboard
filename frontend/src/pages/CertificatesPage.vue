@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCertificatesStore } from '@/stores/certificates'
+import { useContainersStore } from '@/stores/containers'
 import { createCertificate } from '@/services/certificateApi'
 import CertificateCard from '@/components/CertificateCard.vue'
 import CertificateDetail from '@/components/CertificateDetail.vue'
 
 const store = useCertificatesStore()
+const containers = useContainersStore()
+const isK8s = computed(() => containers.runtimeName === 'kubernetes')
+const labelOrAnnotation = computed(() => isK8s.value ? 'annotation' : 'label')
 const selectedId = ref<number | null>(null)
 const showCreateForm = ref(false)
 const createError = ref<string | null>(null)
@@ -270,46 +274,39 @@ function closeDetail() {
       {{ store.error }}
     </div>
 
-    <!-- Empty state -->
-    <div
-      v-else-if="sortedCertificates.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-center"
-    >
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-4" style="color: var(--pb-text-muted)">
-        <rect x="10" y="6" width="36" height="44" rx="4" />
-        <path d="M20 20h16M20 28h16M20 36h10" stroke-linecap="round" />
-        <circle cx="40" cy="40" r="10" fill="var(--pb-bg-primary)" />
-        <path d="M37 40l2 2 4-4" stroke="var(--pb-status-ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <h3 class="text-lg font-medium mb-1" :style="{ color: 'var(--pb-text-primary)' }">No certificate monitors</h3>
-      <p class="text-sm mb-4 max-w-sm" :style="{ color: 'var(--pb-text-muted)' }">
-        HTTPS endpoints are auto-detected from Docker labels. Create standalone monitors for additional hosts.
-      </p>
-      <button
-        class="min-h-[44px] rounded-lg px-4 text-sm font-medium"
-        :style="{
-          backgroundColor: 'var(--pb-accent)',
-          color: 'var(--pb-text-inverted)',
-          borderRadius: 'var(--pb-radius-lg)',
-        }"
-        @click="showCreateForm = true"
-      >
-        Add Certificate Monitor
-      </button>
-    </div>
+    <!-- Content area with persistent background hint -->
+    <div v-else class="relative min-h-[300px]">
+      <!-- Background hint — always visible -->
+      <div class="flex flex-col items-center justify-center py-16 text-center">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-4" style="color: var(--pb-text-muted)">
+          <rect x="10" y="6" width="36" height="44" rx="4" />
+          <path d="M20 20h16M20 28h16M20 36h10" stroke-linecap="round" />
+          <circle cx="40" cy="40" r="10" fill="var(--pb-bg-primary)" />
+          <path d="M37 40l2 2 4-4" stroke="var(--pb-status-ok)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p class="text-sm mb-2 max-w-sm" :style="{ color: 'var(--pb-text-muted)' }">
+          HTTPS endpoints are auto-detected from {{ labelOrAnnotation }}s. Create standalone monitors for additional hosts.
+        </p>
+        <p class="text-sm max-w-sm" :style="{ color: 'var(--pb-text-muted)' }">
+          Add the <code class="rounded-md px-1.5 py-0.5 text-xs" style="background: var(--pb-bg-elevated); color: var(--pb-text-secondary)">pulseboard.tls.certificates</code>
+          {{ labelOrAnnotation }} to monitor specific certificates.
+        </p>
+      </div>
 
-    <!-- Certificate grid -->
-    <div
-      v-else
-      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <CertificateCard
-        v-for="cert in sortedCertificates"
-        :key="cert.id"
-        :certificate="cert"
-        @refresh="store.fetchCertificates()"
-        @select="openDetail($event)"
-      />
+      <!-- Certificate grid — overlays on top -->
+      <div
+        v-if="sortedCertificates.length > 0"
+        class="absolute inset-0 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 content-start"
+        :style="{ backgroundColor: 'var(--pb-bg-primary)' }"
+      >
+        <CertificateCard
+          v-for="cert in sortedCertificates"
+          :key="cert.id"
+          :certificate="cert"
+          @refresh="store.fetchCertificates()"
+          @select="openDetail($event)"
+        />
+      </div>
     </div>
   </div>
 </template>

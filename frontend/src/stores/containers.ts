@@ -144,12 +144,17 @@ export const useContainersStore = defineStore('containers', () => {
     if (data.label) runtimeLabel.value = data.label
   }
 
+  function onReconnected() {
+    fetchContainers()
+  }
+
   function connectSSE() {
     sseBus.on('container.discovered', onDiscovered)
     sseBus.on('container.state_changed', onStateChanged)
     sseBus.on('container.health_changed', onHealthChanged)
     sseBus.on('container.archived', onArchived)
     sseBus.on('runtime.status', onRuntimeStatus)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -159,6 +164,7 @@ export const useContainersStore = defineStore('containers', () => {
     sseBus.off('container.health_changed', onHealthChanged)
     sseBus.off('container.archived', onArchived)
     sseBus.off('runtime.status', onRuntimeStatus)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

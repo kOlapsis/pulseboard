@@ -101,6 +101,10 @@ export const useCertificatesStore = defineStore('certificates', () => {
     certificates.value = certificates.value.filter((c) => c.id !== data.monitor_id)
   }
 
+  function onReconnected() {
+    fetchCertificates()
+  }
+
   function connectSSE() {
     sseBus.on('certificate.created', onCreated)
     sseBus.on('certificate.check_completed', onCheckCompleted)
@@ -108,6 +112,7 @@ export const useCertificatesStore = defineStore('certificates', () => {
     sseBus.on('certificate.alert', onAlert)
     sseBus.on('certificate.recovery', onRecovery)
     sseBus.on('certificate.deleted', onDeleted)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -118,6 +123,7 @@ export const useCertificatesStore = defineStore('certificates', () => {
     sseBus.off('certificate.alert', onAlert)
     sseBus.off('certificate.recovery', onRecovery)
     sseBus.off('certificate.deleted', onDeleted)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

@@ -40,7 +40,7 @@ Most self-hosters juggle 3-5 tools to monitor their stack: one for containers, o
 | CPU/memory/network metrics   | **Yes**    | No          | Limited    | No         |
 | Image update detection       | **Yes**    | No          | Yes        | No         |
 | Public status page           | **Yes**    | Yes         | No         | No         |
-| Alerting (webhook + SMTP)    | **Yes**    | Yes         | Limited    | No         |
+| Alerting (webhook, Discord)  | **Yes**    | Yes         | Limited    | No         |
 | Kubernetes native            | **Yes**    | No          | Yes        | No         |
 | Single binary, zero deps     | **Yes**    | Node.js     | Docker API | Docker API |
 
@@ -126,7 +126,7 @@ Knows when your images have updates available. Scans OCI registries, compares di
 
 ### Alert Engine
 
-Unified alerts across all monitoring sources. Route by severity, source, or entity to specific webhook channels (Slack, Discord, Teams, generic HTTP). Silence rules for planned maintenance. Exponential backoff retry on delivery.
+Unified alerts across all monitoring sources. Webhook and Discord channels included. Silence rules for planned maintenance. Exponential backoff retry on delivery. Slack, Teams, and email channels available with PulseBoard Pro.
 
 ### Public Status Page
 
@@ -161,7 +161,7 @@ labels:
   pulseboard.group: "backend"                  # Custom group name
   pulseboard.alert.severity: "critical"        # critical | warning | info
   pulseboard.alert.restart_threshold: "5"      # Restart loop threshold
-  pulseboard.alert.channels: "slack,email"     # Route to specific channels
+  pulseboard.alert.channels: "ops-webhook"      # Route to specific channels
 ```
 
 </details>
@@ -294,7 +294,7 @@ services:
 | Resource    | `cpu_threshold`, `memory_threshold`    | Warning           |
 | Update      | `available`                            | Info              |
 
-Deliver to Slack, Discord, Teams, or any HTTP endpoint.
+Deliver to Discord or any HTTP webhook. Slack, Teams, and email available with PulseBoard Pro.
 
 ---
 
@@ -414,6 +414,37 @@ frontend/src/
 
 ---
 
+## Editions
+
+PulseBoard is available in two editions:
+
+| Feature | Community | Pro |
+|---------|:---------:|:---:|
+| Container auto-discovery | x | x |
+| Endpoint monitoring (HTTP/TCP) | x | x |
+| Heartbeat/cron monitoring | x (10 max) | x (unlimited) |
+| TLS certificate monitoring | x | x |
+| Resource metrics | x | x |
+| Update intelligence (digest scan) | x | x |
+| Alert engine (fire, recover, silence) | x | x |
+| Webhook + Discord channels | x | x |
+| Public status page (components, groups) | x | x |
+| REST API + SSE | x | x |
+| PWA support | x | x |
+| Slack, Teams, Email channels | | x |
+| Alert escalation + routing | | x |
+| Maintenance windows | | x |
+| Alert templates | | x |
+| CVE enrichment + risk scoring | | x |
+| Incident management | | x |
+| Subscriber notifications | | x |
+
+The Community Edition is fully functional for self-hosted monitoring. PulseBoard Pro adds advanced alerting, notification channels, and enterprise features.
+
+PulseBoard Pro is available as a separate commercial product.
+
+---
+
 ## Contributing
 
 Contributions are welcome! Please open an issue first to discuss what you'd like to change.
@@ -422,6 +453,10 @@ Contributions are welcome! Please open an issue first to discuss what you'd like
 
 ## License
 
-Copyright 2026 Benjamin Touchard
+Copyright 2026 kOlapsis (Benjamin Touchard)
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+Licensed under the [Business Source License 1.1](LICENSE) (BSL 1.1).
+
+**You can use PulseBoard freely** for personal use, internal business use, and non-commercial purposes. The only restriction is offering PulseBoard as a competing hosted service.
+
+Each version converts to [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) four years after release.

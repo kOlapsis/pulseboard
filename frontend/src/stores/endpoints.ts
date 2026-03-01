@@ -157,6 +157,10 @@ export const useEndpointsStore = defineStore('endpoints', () => {
     }
   }
 
+  function onReconnected() {
+    fetchEndpoints()
+  }
+
   function connectSSE() {
     sseBus.on('endpoint.discovered', onDiscovered)
     sseBus.on('endpoint.status_changed', onStatusChanged)
@@ -164,6 +168,7 @@ export const useEndpointsStore = defineStore('endpoints', () => {
     sseBus.on('endpoint.alert', onAlert)
     sseBus.on('endpoint.recovery', onRecovery)
     sseBus.on('endpoint.config_error', onConfigError)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -174,6 +179,7 @@ export const useEndpointsStore = defineStore('endpoints', () => {
     sseBus.off('endpoint.alert', onAlert)
     sseBus.off('endpoint.recovery', onRecovery)
     sseBus.off('endpoint.config_error', onConfigError)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

@@ -1,6 +1,6 @@
 # Alert Engine
 
-Unified alerts across all monitoring sources. Route by severity, source, or entity to specific webhook channels. Silence rules for planned maintenance. Exponential backoff retry on delivery failures.
+Unified alerts across all monitoring sources. Webhook and Discord channels included. Silence rules for planned maintenance. Exponential backoff retry on delivery failures.
 
 ---
 
@@ -21,20 +21,11 @@ PulseBoard generates alerts from every monitoring subsystem:
 
 ## Notification Channels
 
-PulseBoard delivers alerts to webhook channels. Supported formats:
-
-### Slack
-
-```bash
-POST /api/v1/channels
-{
-  "name": "ops-slack",
-  "type": "slack",
-  "url": "https://hooks.slack.com/services/T.../B.../xxx"
-}
-```
+PulseBoard delivers alerts to Discord, any HTTP webhook, and more. Each channel type formats the payload natively for the target platform.
 
 ### Discord
+
+PulseBoard sends [Discord embeds](https://discord.com/developers/docs/resources/channel#embed-object) with severity-colored borders.
 
 ```bash
 POST /api/v1/channels
@@ -45,20 +36,9 @@ POST /api/v1/channels
 }
 ```
 
-### Microsoft Teams
-
-```bash
-POST /api/v1/channels
-{
-  "name": "ops-teams",
-  "type": "teams",
-  "url": "https://outlook.office.com/webhook/..."
-}
-```
-
 ### Generic HTTP Webhook
 
-For any other service, use a generic webhook:
+For Slack, Teams, or any other service, use a generic webhook:
 
 ```bash
 POST /api/v1/channels
@@ -70,6 +50,10 @@ POST /api/v1/channels
 ```
 
 PulseBoard sends a JSON payload with alert details to the configured URL.
+
+### Pro Channels
+
+PulseBoard Pro adds native Slack (Block Kit), Microsoft Teams (MessageCard), and Email (SMTP) channels with platform-specific formatting.
 
 ---
 
@@ -89,7 +73,7 @@ You can also route alerts per container using Docker labels:
 
 ```yaml
 labels:
-  pulseboard.alert.channels: "slack,email"
+  pulseboard.alert.channels: "ops-webhook,ops-discord"
   pulseboard.alert.severity: "critical"
 ```
 

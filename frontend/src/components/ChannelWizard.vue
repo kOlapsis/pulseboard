@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { createChannel, testChannel } from '@/services/alertApi'
+import { useEdition } from '@/composables/useEdition'
+
+const { hasFeature } = useEdition()
 
 const emit = defineEmits<{
   created: [id: number]
@@ -20,7 +23,7 @@ const form = ref({
   enabled: true,
 })
 
-const channelTypes = [
+const allChannelTypes = [
   {
     key: 'slack',
     label: 'Slack',
@@ -36,11 +39,18 @@ const channelTypes = [
     urlPlaceholder: 'https://discord.com/api/webhooks/...',
   },
   {
+    key: 'teams',
+    label: 'Teams',
+    description: 'Send alerts to Microsoft Teams via webhook',
+    icon: 'teams',
+    urlPlaceholder: 'https://outlook.office.com/webhook/...',
+  },
+  {
     key: 'email',
     label: 'Email',
     description: 'Send email notifications via configured SMTP',
     icon: 'email',
-    urlPlaceholder: 'mailto:alerts@example.com',
+    urlPlaceholder: 'alerts@example.com',
   },
   {
     key: 'webhook',
@@ -51,8 +61,12 @@ const channelTypes = [
   },
 ]
 
+const channelTypes = computed(() =>
+  allChannelTypes.filter(t => t.key !== 'email' || hasFeature('smtp'))
+)
+
 const selectedTypeConfig = computed(() =>
-  channelTypes.find(t => t.key === selectedType.value)
+  channelTypes.value.find(t => t.key === selectedType.value)
 )
 
 function selectType(type: string) {
@@ -170,6 +184,11 @@ function goBack() {
               <path d="M4 16c2 1.5 4 2 6 2s4-.5 6-2" />
               <circle cx="7.5" cy="10" r="1.5" />
               <circle cx="12.5" cy="10" r="1.5" />
+            </svg>
+            <!-- Teams -->
+            <svg v-else-if="type.icon === 'teams'" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: #6264A7">
+              <rect x="3" y="4" width="14" height="12" rx="2" />
+              <path d="M7 10h6M10 7v6" />
             </svg>
             <!-- Email -->
             <svg v-else-if="type.icon === 'email'" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--pb-status-ok)">

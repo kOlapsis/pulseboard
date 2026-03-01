@@ -247,6 +247,22 @@ func (s *Service) DeleteMonitor(ctx context.Context, id int64) error {
 	return nil
 }
 
+// DeactivateByEndpointID soft-deletes the auto-detected cert monitor linked to an endpoint.
+func (s *Service) DeactivateByEndpointID(ctx context.Context, endpointID int64) {
+	monitor, err := s.store.GetMonitorByEndpointID(ctx, endpointID)
+	if err != nil || monitor == nil {
+		return
+	}
+	if err := s.store.SoftDeleteMonitor(ctx, monitor.ID); err != nil {
+		s.logger.Error("deactivate cert monitor for removed endpoint", "monitor_id", monitor.ID, "endpoint_id", endpointID, "error", err)
+		return
+	}
+	s.emit("certificate.deleted", map[string]interface{}{
+		"monitor_id": monitor.ID,
+		"hostname":   monitor.Hostname,
+	})
+}
+
 // --- Label-discovered monitors ---
 
 // SyncFromLabels reconciles label-discovered certificate monitors for a container.

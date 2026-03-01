@@ -96,10 +96,15 @@ export const useResourcesStore = defineStore('resources', () => {
     delete alerts.value[data.container_id]
   }
 
+  function onReconnected() {
+    fetchSummary()
+  }
+
   function connectSSE() {
     sseBus.on('resource.snapshot', onSnapshot)
     sseBus.on('resource.alert', onAlert)
     sseBus.on('resource.recovery', onRecovery)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -107,6 +112,7 @@ export const useResourcesStore = defineStore('resources', () => {
     sseBus.off('resource.snapshot', onSnapshot)
     sseBus.off('resource.alert', onAlert)
     sseBus.off('resource.recovery', onRecovery)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

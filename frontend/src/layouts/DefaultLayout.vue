@@ -2,6 +2,7 @@
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { ref } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
+import { useAppVersion } from '@/composables/useAppVersion'
 import {
   Activity,
   ArrowUpCircle,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
+const { version } = useAppVersion()
 
 const mobileMenuOpen = ref(false)
 function closeMobileMenu() {
@@ -87,7 +89,7 @@ const mainNav = [
               >
               <span
                 class="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 font-bold"
-                >V3.0</span
+                >{{ version }}</span
               >
             </div>
             <button

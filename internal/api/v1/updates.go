@@ -53,11 +53,16 @@ func (h *UpdateHandler) HandleGetUpdateSummary(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Determine scan status
-	scanStatus := "unknown"
-	latest, _ := h.service.GetLatestScanRecord(r.Context())
-	if latest != nil {
-		scanStatus = string(latest.Status)
+	// Determine scan status — use IsScanning() as source of truth to avoid
+	// the race where the goroutine has started but the ScanRecord doesn't exist yet.
+	var scanStatus string
+	if h.service.IsScanning() {
+		scanStatus = string("running")
+	} else {
+		scanStatus = "idle"
+		if latest, _ := h.service.GetLatestScanRecord(r.Context()); latest != nil {
+			scanStatus = string(latest.Status)
+		}
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]interface{}{

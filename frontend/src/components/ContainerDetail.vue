@@ -319,9 +319,7 @@ watch(() => props.containerId, () => {
           </div>
 
           <!-- Event Timeline -->
-          <div v-if="transitions.length > 0">
-            <ContainerEventTimeline :transitions="transitions" :hours="24" />
-          </div>
+          <ContainerEventTimeline :transitions="transitions" :hours="24" :current-state="container.state" />
 
           <!-- State transitions history -->
           <div>

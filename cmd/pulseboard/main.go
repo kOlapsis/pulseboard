@@ -141,9 +141,26 @@ func main() {
 	hbSvc.SetBaseURL(envOrDefault("PULSEBOARD_BASE_URL", "http://localhost:"+addr[1:]))
 	hbSvc.StartDeadlineChecker(ctx)
 
+	// --- SMTP configuration ---
+	smtpHost := os.Getenv("PULSEBOARD_SMTP_HOST")
+	var smtpSender *alert.SMTPSender
+	if smtpHost != "" {
+		smtpSender = alert.NewSMTPSender(alert.SMTPConfig{
+			Host:     smtpHost,
+			Port:     envOrDefault("PULSEBOARD_SMTP_PORT", "587"),
+			Username: os.Getenv("PULSEBOARD_SMTP_USERNAME"),
+			Password: os.Getenv("PULSEBOARD_SMTP_PASSWORD"),
+			From:     envOrDefault("PULSEBOARD_SMTP_FROM", "pulseboard@localhost"),
+		})
+		logger.Info("SMTP sender configured", "host", smtpHost)
+	}
+
 	// --- Alert engine ---
 	alertEngine := alert.NewEngine(alertStore, channelStore, silenceStore, logger)
 	notifier := alert.NewNotifier(channelStore, logger)
+	if smtpSender != nil {
+		notifier.SetSMTPSender(smtpSender)
+	}
 	alertEngine.SetNotifier(notifier)
 
 	// --- HTTP server ---

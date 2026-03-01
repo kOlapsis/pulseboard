@@ -121,6 +121,10 @@ export const useHeartbeatsStore = defineStore('heartbeats', () => {
     heartbeats.value = heartbeats.value.filter((hb) => hb.id !== data.heartbeat_id)
   }
 
+  function onReconnected() {
+    fetchHeartbeats()
+  }
+
   function connectSSE() {
     sseBus.on('heartbeat.created', onCreated)
     sseBus.on('heartbeat.ping_received', onPingReceived)
@@ -128,6 +132,7 @@ export const useHeartbeatsStore = defineStore('heartbeats', () => {
     sseBus.on('heartbeat.alert', onAlert)
     sseBus.on('heartbeat.recovery', onRecovery)
     sseBus.on('heartbeat.deleted', onDeleted)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -138,6 +143,7 @@ export const useHeartbeatsStore = defineStore('heartbeats', () => {
     sseBus.off('heartbeat.alert', onAlert)
     sseBus.off('heartbeat.recovery', onRecovery)
     sseBus.off('heartbeat.deleted', onDeleted)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

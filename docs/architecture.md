@@ -86,8 +86,13 @@
 ```
 cmd/pulseboard/            Entry point, service wiring
   web/                     Embedded frontend (embed.FS)
-internal/
+pkg/                       Public packages (importable by Pro)
+    app/                   AppBuilder, composable application assembly
+    alert/                 Types, interfaces, CE formatters (webhook, discord)
+    pro/                   Extension point interfaces + no-ops
+internal/                  Private packages
     api/v1/                HTTP handlers, SSE broker, router
+    alertengine/           Alert engine, notifier
     container/             Container model, service, uptime
     docker/                Docker runtime implementation
     kubernetes/            Kubernetes runtime implementation
@@ -96,7 +101,6 @@ internal/
     heartbeat/             Heartbeat/cron monitoring
     certificate/           TLS certificate monitoring
     resource/              Resource metrics collection
-    alert/                 Alert engine, notifier, restart detection
     update/                Update intelligence, registry
     status/                Public status page (handler, templates)
     webhook/               Webhook dispatcher

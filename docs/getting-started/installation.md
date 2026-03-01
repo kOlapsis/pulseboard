@@ -87,11 +87,10 @@ npm install
 npm run build-only
 cd ..
 
-# Copy frontend assets into the backend embed directory
-cp -r frontend/dist backend/cmd/pulseboard/web/dist/
+# Copy frontend assets into the embed directory
+cp -r frontend/dist cmd/pulseboard/web/dist/
 
 # Build the Go binary
-cd backend
 CGO_ENABLED=1 go build -o pulseboard ./cmd/pulseboard
 
 # Run

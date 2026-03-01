@@ -5,12 +5,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1'
 type EventHandler = (event: MessageEvent) => void
 
 const listeners = new Map<string, Set<EventHandler>>()
-// Track which event names have been registered on the current EventSource
 const registeredEvents = new Set<string>()
 let eventSource: EventSource | null = null
 let refCount = 0
 let retryCount = 0
 let retryTimer: ReturnType<typeof setTimeout> | null = null
+/** true once the first successful connection has been established */
+let hasConnectedOnce = false
 
 export const connected = ref(false)
 
@@ -31,36 +32,55 @@ function registerEvent(es: EventSource, eventName: string) {
   }) as EventListener)
 }
 
+function scheduleRetry() {
+  if (retryTimer) return
+  const delay = Math.min(30000, 1000 * Math.pow(2, retryCount))
+  retryCount++
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    if (refCount > 0) openConnection()
+  }, delay)
+}
+
 function openConnection() {
   if (retryTimer) {
     clearTimeout(retryTimer)
     retryTimer = null
   }
-
-  const url = new URL(`${API_BASE}/containers/events`, window.location.origin)
-  eventSource = new EventSource(url.toString())
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
   registeredEvents.clear()
 
-  eventSource.onopen = () => {
+  const url = new URL(`${API_BASE}/containers/events`, window.location.origin)
+  const es = new EventSource(url.toString())
+  eventSource = es
+
+  es.onopen = () => {
+    if (es !== eventSource) return // stale instance
+    const isReconnect = hasConnectedOnce
     connected.value = true
+    hasConnectedOnce = true
     retryCount = 0
+    if (isReconnect) {
+      dispatch('sse.reconnected', new MessageEvent('sse.reconnected'))
+    }
   }
 
-  eventSource.onerror = () => {
+  es.onerror = () => {
+    if (es !== eventSource) return // stale instance
     connected.value = false
-    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-      eventSource = null
-      const delay = Math.min(30000, 1000 * Math.pow(2, retryCount))
-      retryCount++
-      retryTimer = setTimeout(() => {
-        if (refCount > 0) openConnection()
-      }, delay)
-    }
+    // Close the native EventSource to prevent its built-in retry
+    // (we manage reconnection ourselves with backoff).
+    es.close()
+    eventSource = null
+    scheduleRetry()
   }
 
   // Register all currently known event names on the new EventSource
   for (const eventName of listeners.keys()) {
-    registerEvent(eventSource, eventName)
+    registerEvent(es, eventName)
   }
 }
 
@@ -75,6 +95,7 @@ function closeConnection() {
   }
   registeredEvents.clear()
   connected.value = false
+  hasConnectedOnce = false
   retryCount = 0
 }
 
@@ -96,7 +117,6 @@ export function on(eventName: string, handler: EventHandler) {
   }
   handlers.add(handler)
 
-  // If already connected, ensure this event name is registered on the native EventSource
   if (eventSource) {
     registerEvent(eventSource, eventName)
   }

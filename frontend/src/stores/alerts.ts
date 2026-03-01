@@ -183,6 +183,11 @@ export const useAlertsStore = defineStore('alerts', () => {
     }
   }
 
+  function onReconnected() {
+    fetchActiveAlerts()
+    fetchChannels()
+  }
+
   function connectSSE() {
     sseBus.on('alert.fired', onAlertFired)
     sseBus.on('alert.resolved', onAlertResolved)
@@ -192,6 +197,7 @@ export const useAlertsStore = defineStore('alerts', () => {
     sseBus.on('channel.deleted', onChannelDeleted)
     sseBus.on('silence.created', onSilenceCreated)
     sseBus.on('silence.cancelled', onSilenceCancelled)
+    sseBus.on('sse.reconnected', onReconnected)
     sseBus.connect()
   }
 
@@ -204,6 +210,7 @@ export const useAlertsStore = defineStore('alerts', () => {
     sseBus.off('channel.deleted', onChannelDeleted)
     sseBus.off('silence.created', onSilenceCreated)
     sseBus.off('silence.cancelled', onSilenceCancelled)
+    sseBus.off('sse.reconnected', onReconnected)
     sseBus.disconnect()
   }
 

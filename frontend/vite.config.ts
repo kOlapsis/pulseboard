@@ -16,13 +16,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: false, // Use external manifest.webmanifest
       workbox: {
+        navigateFallbackDenylist: [/\/api\//, /\/ping\//, /\/status\//],
         runtimeCaching: [
           {
-            urlPattern: /\/api\/v1\/(?!status\/smtp|channels|webhooks)/,
+            urlPattern: /\/api\/v1\/(?!containers\/events|status\/smtp|channels|webhooks)/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
               expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              networkTimeoutSeconds: 5,
             },
           },
           {

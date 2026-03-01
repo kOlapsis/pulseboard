@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import ContainerList from '@/components/ContainerList.vue'
 import ContainerDetail from '@/components/ContainerDetail.vue'
 import ResourceSummary from '@/components/ResourceSummary.vue'
 import SlideOverPanel from '@/components/ui/SlideOverPanel.vue'
 import { useContainersStore } from '@/stores/containers'
 import type { Container } from '@/services/containerApi'
-import { AlertTriangle } from 'lucide-vue-next'
+import { AlertTriangle, Info } from 'lucide-vue-next'
 
 const store = useContainersStore()
+const isK8s = computed(() => store.runtimeName === 'kubernetes')
+const labelOrAnnotation = computed(() => isK8s.value ? 'annotation' : 'label')
+const showLabelTips = ref(localStorage.getItem('pb:hideLabelTips') !== '1')
+
+function dismissLabelTips() {
+  showLabelTips.value = false
+  localStorage.setItem('pb:hideLabelTips', '1')
+}
 
 const selectedContainer = ref<Container | null>(null)
 const detailOpen = ref(false)
@@ -43,6 +51,31 @@ function openDetail(container: Container) {
             Cannot connect to the container runtime. Check that PulseBoard has access to the {{ store.runtimeLabel }} API.
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- Label tips info banner -->
+    <div
+      v-if="showLabelTips && store.runtimeConnected"
+      class="mb-6 rounded-2xl p-4 bg-blue-500/10 border border-blue-500/20"
+    >
+      <div class="flex items-start gap-3">
+        <Info :size="20" class="text-blue-400 shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <h3 class="text-sm font-medium text-blue-300">Customize with {{ labelOrAnnotation }}s</h3>
+          <p class="mt-1 text-sm text-slate-400">
+            Use {{ labelOrAnnotation }}s to configure container behavior:
+            <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.ignore</code> to hide a container,
+            <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.group</code> to group containers,
+            <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.alert.severity</code> to set alert severity.
+          </p>
+        </div>
+        <button
+          @click="dismissLabelTips()"
+          class="text-slate-500 hover:text-slate-300 shrink-0"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12" /><line x1="12" y1="4" x2="4" y2="12" /></svg>
+        </button>
       </div>
     </div>
 

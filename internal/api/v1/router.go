@@ -261,7 +261,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	})
 
 	// Edition endpoint — exposes CE/Pro feature flags for frontend gating
-	r.mux.HandleFunc("GET /api/v1/edition", handleGetEdition)
+	smtpConfigured := alertOpts.Notifier != nil && alertOpts.Notifier.SMTPConfigured()
+	r.mux.HandleFunc("GET /api/v1/edition", handleGetEdition(smtpConfigured))
 
 	// Health endpoint
 	r.mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, req *http.Request) {
@@ -299,6 +300,11 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		certSvc.SetEventCallback(func(eventType string, data interface{}) {
 			broker.Broadcast(SSEEvent{Type: eventType, Data: data})
 		})
+	}
+
+	// Wire endpoint removal to certificate monitor cleanup
+	if epSvc != nil && certSvc != nil {
+		epSvc.SetEndpointRemovedCallback(certSvc.DeactivateByEndpointID)
 	}
 
 	// Wire SSE broadcasting from resource service events
@@ -398,22 +404,24 @@ func bodySizeLimitMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// handleGetEdition returns the current edition and Pro feature flags.
-func handleGetEdition(w http.ResponseWriter, _ *http.Request) {
-	isPro := pro.CurrentEdition() == pro.Pro
-	WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"edition": string(pro.CurrentEdition()),
-		"features": map[string]bool{
-			"cve_enrichment":    isPro,
-			"risk_scoring":      isPro,
-			"changelog":         isPro,
-			"incidents":         isPro,
-			"maintenance_windows": isPro,
-			"subscribers":       isPro,
-			"smtp":              isPro,
-			"alert_escalation":  isPro,
-			"alert_routing":     isPro,
-			"alert_templates":   isPro,
-		},
-	})
+// handleGetEdition returns a handler for the current edition and feature flags.
+func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		isPro := pro.CurrentEdition() == pro.Pro
+		WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"edition": string(pro.CurrentEdition()),
+			"features": map[string]bool{
+				"cve_enrichment":      isPro,
+				"risk_scoring":        isPro,
+				"changelog":           isPro,
+				"incidents":           isPro,
+				"maintenance_windows": isPro,
+				"subscribers":         isPro,
+				"smtp":                smtpConfigured,
+				"alert_escalation":    isPro,
+				"alert_routing":       isPro,
+				"alert_templates":     isPro,
+			},
+		})
+	}
 }

@@ -14,14 +14,18 @@ type EventCallback func(eventType string, data interface{})
 // ("endpoint.alert" or "endpoint.recovery") and event data, or empty string if no alert.
 type AlertCallback func(ep *Endpoint, result CheckResult) (eventType string, eventData interface{})
 
+// EndpointRemovedCallback is called when an endpoint is deactivated (label removed or container destroyed).
+type EndpointRemovedCallback func(ctx context.Context, endpointID int64)
+
 // Service orchestrates endpoint discovery, persistence, and the check engine.
 type Service struct {
-	store         EndpointStore
-	engine        *CheckEngine
-	logger        *slog.Logger
-	onEvent       EventCallback
-	alertCallback AlertCallback
-	ctx           context.Context
+	store             EndpointStore
+	engine            *CheckEngine
+	logger            *slog.Logger
+	onEvent           EventCallback
+	alertCallback     AlertCallback
+	onEndpointRemoved EndpointRemovedCallback
+	ctx               context.Context
 }
 
 // NewService creates a new endpoint service.
@@ -41,6 +45,11 @@ func (s *Service) SetEventCallback(cb EventCallback) {
 // SetAlertCallback sets the callback for evaluating alert thresholds on check results.
 func (s *Service) SetAlertCallback(cb AlertCallback) {
 	s.alertCallback = cb
+}
+
+// SetEndpointRemovedCallback sets the callback for when an endpoint is deactivated.
+func (s *Service) SetEndpointRemovedCallback(cb EndpointRemovedCallback) {
+	s.onEndpointRemoved = cb
 }
 
 // Start begins the check engine and stores the context for adding endpoints later.
@@ -139,6 +148,9 @@ func (s *Service) SyncEndpoints(ctx context.Context, containerName, externalID s
 				continue
 			}
 			s.engine.RemoveEndpoint(ep.ID)
+			if s.onEndpointRemoved != nil {
+				s.onEndpointRemoved(ctx, ep.ID)
+			}
 			s.emitEvent("endpoint.removed", map[string]interface{}{
 				"endpoint_id":    ep.ID,
 				"container_name": containerName,
@@ -262,6 +274,9 @@ func (s *Service) HandleContainerDestroy(ctx context.Context, externalID string)
 		s.engine.RemoveEndpoint(ep.ID)
 		if err := s.store.DeactivateEndpoint(ctx, ep.ID); err != nil {
 			s.logger.Error("deactivate endpoint on destroy", "endpoint_id", ep.ID, "error", err)
+		}
+		if s.onEndpointRemoved != nil {
+			s.onEndpointRemoved(ctx, ep.ID)
 		}
 		s.emitEvent("endpoint.removed", map[string]interface{}{
 			"endpoint_id":    ep.ID,

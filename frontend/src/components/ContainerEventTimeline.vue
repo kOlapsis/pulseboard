@@ -5,76 +5,91 @@ import type { StateTransition } from '@/services/containerApi'
 const props = withDefaults(defineProps<{
   transitions: StateTransition[]
   hours?: number
+  /** Number of bars to render */
+  bars?: number
+  /** Current container state — used as fallback when no transitions exist */
+  currentState?: string
 }>(), {
   hours: 24,
+  bars: 48,
+  currentState: 'running',
 })
 
-const tooltip = ref<{ visible: boolean; x: number; y: number; transition: StateTransition | null }>({
-  visible: false,
-  x: 0,
-  y: 0,
-  transition: null,
-})
+const tooltip = ref<{ visible: boolean; x: number; y: number; state: string; from: string; to: string } | null>(null)
 
 const timeWindow = computed(() => {
   const now = new Date()
   const start = new Date(now.getTime() - props.hours * 60 * 60 * 1000)
-  return { start, end: now }
+  return { start: start.getTime(), end: now.getTime() }
 })
 
-const filteredTransitions = computed(() => {
-  const start = timeWindow.value.start.getTime()
-  return props.transitions.filter(t => new Date(t.timestamp).getTime() >= start)
-})
-
-function positionPercent(timestamp: string): number {
-  const ts = new Date(timestamp).getTime()
-  const start = timeWindow.value.start.getTime()
-  const end = timeWindow.value.end.getTime()
-  const pct = ((ts - start) / (end - start)) * 100
-  return Math.max(0, Math.min(100, pct))
-}
-
-function nowPercent(): number {
-  return 100
-}
-
-function eventColor(t: StateTransition): string {
-  const state = t.new_state
+function stateColor(state: string): string {
   if (state === 'running') return 'var(--pb-status-ok)'
   if (state === 'exited' || state === 'dead') return 'var(--pb-status-down)'
   if (state === 'restarting') return 'var(--pb-status-warn)'
   if (state === 'paused') return 'var(--pb-status-paused)'
+  if (state === 'created') return 'var(--pb-text-muted)'
   return 'var(--pb-text-muted)'
 }
 
-function showTooltip(event: MouseEvent, t: StateTransition) {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  tooltip.value = {
-    visible: true,
-    x: rect.left + rect.width / 2,
-    y: rect.top,
-    transition: t,
+function stateOpacity(state: string): string {
+  if (state === 'running') return '0.4'
+  return '1'
+}
+
+/** Build sorted transitions within window, prepending initial state */
+const sortedTransitions = computed(() => {
+  const { start, end } = timeWindow.value
+  const all = props.transitions
+    .map(t => ({ state: t.new_state, ts: new Date(t.timestamp).getTime() }))
+    .filter(t => t.ts <= end)
+    .sort((a, b) => a.ts - b.ts)
+
+  // Determine state at window start: last transition before window start
+  const before = all.filter(t => t.ts < start)
+  const initialState = before.length > 0 ? before[before.length - 1]!.state : (all.length > 0 ? all[0]!.state : props.currentState)
+
+  // Filter to only transitions within window
+  const inWindow = all.filter(t => t.ts >= start)
+
+  return { initialState, transitions: inWindow }
+})
+
+/** Generate bar data: each bar has a dominant state for its time slice */
+const barData = computed(() => {
+  const { start, end } = timeWindow.value
+  const { initialState, transitions } = sortedTransitions.value
+  const sliceDuration = (end - start) / props.bars
+  const result: { state: string; sliceStart: number; sliceEnd: number }[] = []
+
+  let tIdx = 0
+  let currentState = initialState
+
+  for (let i = 0; i < props.bars; i++) {
+    const sliceStart = start + i * sliceDuration
+    const sliceEnd = sliceStart + sliceDuration
+
+    // Advance through transitions that fall within this slice
+    let dominantState = currentState
+    while (tIdx < transitions.length && transitions[tIdx]!.ts < sliceEnd) {
+      dominantState = transitions[tIdx]!.state
+      currentState = dominantState
+      tIdx++
+    }
+
+    result.push({ state: dominantState, sliceStart, sliceEnd })
   }
-}
 
-function hideTooltip() {
-  tooltip.value.visible = false
-}
-
-function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString()
-}
+  return result
+})
 
 const timeLabels = computed(() => {
   const labels: { text: string; pct: number }[] = []
   const intervals = Math.min(props.hours, 6)
+  const { start, end } = timeWindow.value
   for (let i = 0; i <= intervals; i++) {
     const pct = (i / intervals) * 100
-    const time = new Date(
-      timeWindow.value.start.getTime() +
-      (i / intervals) * (timeWindow.value.end.getTime() - timeWindow.value.start.getTime())
-    )
+    const time = new Date(start + (i / intervals) * (end - start))
     labels.push({
       text: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       pct,
@@ -82,6 +97,26 @@ const timeLabels = computed(() => {
   }
   return labels
 })
+
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function showBarTooltip(event: MouseEvent, bar: { state: string; sliceStart: number; sliceEnd: number }) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  tooltip.value = {
+    visible: true,
+    x: rect.left + rect.width / 2,
+    y: rect.top,
+    state: bar.state,
+    from: formatTime(bar.sliceStart),
+    to: formatTime(bar.sliceEnd),
+  }
+}
+
+function hideTooltip() {
+  tooltip.value = null
+}
 </script>
 
 <template>
@@ -90,53 +125,25 @@ const timeLabels = computed(() => {
       Event Timeline ({{ hours }}h)
     </div>
 
-    <!-- Timeline bar -->
-    <div
-      :style="{
-        position: 'relative',
-        height: '24px',
-        backgroundColor: 'var(--pb-bg-elevated)',
-        borderRadius: 'var(--pb-radius-md)',
-        overflow: 'visible',
-      }"
-    >
-      <!-- Event markers -->
+    <!-- Segmented bar -->
+    <div class="flex gap-[2px] items-center h-5">
       <div
-        v-for="(t, i) in filteredTransitions"
+        v-for="(bar, i) in barData"
         :key="i"
+        class="h-4 w-full rounded-sm transition-opacity cursor-help"
         :style="{
-          position: 'absolute',
-          left: positionPercent(t.timestamp) + '%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          backgroundColor: eventColor(t),
-          border: '2px solid var(--pb-bg-surface)',
-          cursor: 'pointer',
-          zIndex: 2,
+          backgroundColor: stateColor(bar.state),
+          opacity: stateOpacity(bar.state),
+          flex: '1 1 0',
+          minWidth: '2px',
         }"
-        @mouseenter="showTooltip($event, t)"
+        @mouseenter="showBarTooltip($event, bar)"
         @mouseleave="hideTooltip"
-      />
-
-      <!-- Current time indicator -->
-      <div
-        :style="{
-          position: 'absolute',
-          left: nowPercent() + '%',
-          top: '0',
-          width: '2px',
-          height: '100%',
-          backgroundColor: 'var(--pb-accent)',
-          zIndex: 1,
-        }"
       />
     </div>
 
     <!-- Time labels -->
-    <div :style="{ position: 'relative', height: '16px', marginTop: '2px' }">
+    <div :style="{ position: 'relative', height: '16px', marginTop: '4px' }">
       <span
         v-for="label in timeLabels"
         :key="label.pct"
@@ -156,7 +163,7 @@ const timeLabels = computed(() => {
     <!-- Tooltip -->
     <Teleport to="body">
       <div
-        v-if="tooltip.visible && tooltip.transition"
+        v-if="tooltip?.visible"
         :style="{
           position: 'fixed',
           left: tooltip.x + 'px',
@@ -174,14 +181,11 @@ const timeLabels = computed(() => {
           whiteSpace: 'nowrap',
         }"
       >
-        <div :style="{ fontWeight: '600', marginBottom: '0.125rem' }">
-          {{ tooltip.transition.previous_state }} &rarr; {{ tooltip.transition.new_state }}
+        <div :style="{ fontWeight: '600', marginBottom: '0.125rem', color: stateColor(tooltip.state) }">
+          {{ tooltip.state }}
         </div>
         <div :style="{ color: 'var(--pb-text-muted)' }">
-          {{ formatTimestamp(tooltip.transition.timestamp) }}
-        </div>
-        <div v-if="tooltip.transition.exit_code !== undefined && tooltip.transition.exit_code !== null" :style="{ color: 'var(--pb-status-down)' }">
-          Exit code: {{ tooltip.transition.exit_code }}
+          {{ tooltip.from }} &mdash; {{ tooltip.to }}
         </div>
       </div>
     </Teleport>

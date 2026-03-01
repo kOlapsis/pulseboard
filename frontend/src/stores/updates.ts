@@ -160,7 +160,7 @@ export const useUpdatesStore = defineStore('updates', () => {
       const poll = setInterval(async () => {
         try {
           const s = await fetchUpdateSummary()
-          if (s.scan_status !== 'scanning') {
+          if (s.scan_status !== 'running') {
             scanning.value = false
             summary.value = s
             await fetchAllUpdates()
