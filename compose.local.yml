@@ -4,8 +4,6 @@ services:
     build: .
     container_name: pulseboard
     restart: unless-stopped
-    group_add:
-      - ${DOCKER_GID:-983}
     volumes:
       - pulseboard_data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro

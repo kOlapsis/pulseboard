@@ -41,12 +41,10 @@ RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates tzdata \
-    && addgroup -S pulseboard && adduser -S pulseboard -G pulseboard \
-    && mkdir -p /data && chown pulseboard:pulseboard /data
+    && mkdir -p /data
 
 COPY --from=builder /out/pulseboard /app/pulseboard
 
-USER pulseboard
 EXPOSE 8080
 VOLUME /data
 
