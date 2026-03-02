@@ -113,6 +113,17 @@ func (s *AlertStoreImpl) UpdateAlertStatus(ctx context.Context, id int64, status
 	return nil
 }
 
+func (s *AlertStoreImpl) UpdateAlertSeverity(ctx context.Context, id int64, severity, message string) error {
+	_, err := s.writer.Exec(ctx,
+		`UPDATE alerts SET severity = ?, message = ? WHERE id = ?`,
+		severity, message, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update alert severity: %w", err)
+	}
+	return nil
+}
+
 func (s *AlertStoreImpl) GetActiveAlert(ctx context.Context, source, alertType, entityType string, entityID int64) (*alert.Alert, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT `+alertColumns+` FROM alerts

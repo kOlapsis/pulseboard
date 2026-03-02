@@ -132,6 +132,7 @@ type AlertStore interface {
 	GetAlert(ctx context.Context, id int64) (*Alert, error)
 	ListAlerts(ctx context.Context, opts ListAlertsOpts) ([]*Alert, error)
 	UpdateAlertStatus(ctx context.Context, id int64, status string, resolvedAt *time.Time, resolvedByID *int64) error
+	UpdateAlertSeverity(ctx context.Context, id int64, severity, message string) error
 	GetActiveAlert(ctx context.Context, source, alertType, entityType string, entityID int64) (*Alert, error)
 	ListActiveAlerts(ctx context.Context) ([]*Alert, error)
 	DeleteAlertsOlderThan(ctx context.Context, before time.Time) (int64, error)

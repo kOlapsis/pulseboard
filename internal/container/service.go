@@ -177,11 +177,19 @@ func (s *Service) handleStateChange(ctx context.Context, evt ContainerEvent, new
 	// Docker emits die→start (exited→running) during crash-loops; the
 	// "restarting" state only appears in static discovery snapshots.
 	if newState == StateRunning && (previousState == StateRestarting || previousState == StateExited) && s.restartChecker != nil {
-		alert, err := s.restartChecker.Check(ctx, c)
+		result, err := s.restartChecker.Check(ctx, c)
 		if err != nil {
 			s.logger.Error("restart check", "container_id", c.ID, "error", err)
-		} else if alert != nil {
-			s.emitEvent("container.restart_alert", alert)
+		} else if result != nil {
+			s.emitEvent("container.restart_alert", result)
+		} else {
+			// Count is below threshold — emit recovery so the alert engine
+			// can resolve any previously active restart_loop alert.
+			s.emitEvent("container.restart_recovery", map[string]interface{}{
+				"container_id":   c.ID,
+				"container_name": c.Name,
+				"timestamp":      evt.Timestamp,
+			})
 		}
 	}
 

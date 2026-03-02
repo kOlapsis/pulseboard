@@ -103,9 +103,18 @@ export const useAlertsStore = defineStore('alerts', () => {
     } catch {
       return
     }
-    alerts.value = [alert, ...alerts.value]
-    addToActiveByKey(alert)
-    newAlertCount.value++
+    // Upsert by dedup key: if an alert for the same entity+type already
+    // exists (e.g. severity escalation or same entity with new DB ID),
+    // replace it instead of adding a duplicate.
+    const key = alertKey(alert)
+    const existingIdx = alerts.value.findIndex((a) => a.id === alert.id || (a.status === 'active' && alertKey(a) === key))
+    if (existingIdx >= 0) {
+      alerts.value[existingIdx] = alert
+    } else {
+      alerts.value = [alert, ...alerts.value]
+      newAlertCount.value++
+    }
+    upsertActive(alert)
   }
 
   function onAlertResolved(e: MessageEvent) {
@@ -215,8 +224,21 @@ export const useAlertsStore = defineStore('alerts', () => {
   }
 
   // Helpers
-  function addToActiveByKey(alert: Alert) {
+
+  // alertKey returns the dedup key for an alert (matches backend activeAlertKey).
+  function alertKey(a: Alert): string {
+    return `${a.source}/${a.alert_type}/${a.entity_type}/${a.entity_id}`
+  }
+
+  function upsertActive(alert: Alert) {
     if (alert.status !== 'active') return
+    const key = alertKey(alert)
+    // Remove any alert with the same dedup key from all severity buckets.
+    // This handles escalation (warning→critical) and duplicate entity alerts.
+    for (const sev of ['critical', 'warning', 'info'] as const) {
+      activeAlerts.value[sev] = activeAlerts.value[sev].filter((a) => alertKey(a) !== key)
+    }
+    // Add to the correct bucket
     const severity = alert.severity as 'critical' | 'warning' | 'info'
     if (activeAlerts.value[severity]) {
       activeAlerts.value[severity] = [alert, ...activeAlerts.value[severity]]

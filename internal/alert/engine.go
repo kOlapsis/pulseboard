@@ -125,13 +125,18 @@ func (e *Engine) processEvent(ctx context.Context, evt Event) {
 		EntityID:   evt.EntityID,
 	}
 
-	// Dedup: skip if there's already an active alert for this key
+	// Dedup: skip if there's already an active alert for this key,
+	// unless the new event has a higher severity (escalation).
 	e.mu.RLock()
-	if _, exists := e.activeAlerts[key]; exists {
-		e.mu.RUnlock()
+	existing, exists := e.activeAlerts[key]
+	e.mu.RUnlock()
+
+	if exists {
+		if severityRank(evt.Severity) > severityRank(existing.Severity) {
+			e.escalateAlert(ctx, existing, evt)
+		}
 		return
 	}
-	e.mu.RUnlock()
 
 	// Serialize details to JSON
 	detailsJSON := "{}"
@@ -181,6 +186,54 @@ func (e *Engine) processEvent(ctx context.Context, evt Event) {
 	// Dispatch notifications (only if not silenced)
 	if !silenced && e.notifier != nil {
 		e.dispatchNotifications(ctx, a)
+	}
+}
+
+func (e *Engine) escalateAlert(ctx context.Context, existing *Alert, evt Event) {
+	oldSeverity := existing.Severity
+	existing.Severity = evt.Severity
+	existing.Message = evt.Message
+
+	if err := e.alertStore.UpdateAlertSeverity(ctx, existing.ID, evt.Severity, evt.Message); err != nil {
+		e.logger.Error("alert engine: escalate severity", "error", err, "alert_id", existing.ID)
+		return
+	}
+
+	e.mu.Lock()
+	key := activeAlertKey{
+		Source:     existing.Source,
+		AlertType:  existing.AlertType,
+		EntityType: existing.EntityType,
+		EntityID:   existing.EntityID,
+	}
+	e.activeAlerts[key] = existing
+	e.mu.Unlock()
+
+	e.logger.Warn("alert escalated",
+		"alert_id", existing.ID,
+		"entity", existing.EntityName,
+		"from", oldSeverity,
+		"to", evt.Severity,
+	)
+
+	// Broadcast the escalation and dispatch notifications at the new severity
+	e.broadcastAlert(existing, false)
+	if e.notifier != nil {
+		e.dispatchNotifications(ctx, existing)
+	}
+}
+
+// severityRank returns a numeric rank for severity comparison (higher = more severe).
+func severityRank(s string) int {
+	switch s {
+	case SeverityInfo:
+		return 0
+	case SeverityWarning:
+		return 1
+	case SeverityCritical:
+		return 2
+	default:
+		return -1
 	}
 }
 
@@ -453,6 +506,38 @@ func alertToMap(a *Alert) map[string]interface{} {
 	}
 
 	return m
+}
+
+// ResolveByEntity resolves all active alerts for a given entity (e.g. when a
+// container is destroyed). This prevents stale alerts from accumulating when
+// containers are recreated with new internal IDs.
+func (e *Engine) ResolveByEntity(ctx context.Context, entityType string, entityID int64) {
+	now := time.Now()
+
+	e.mu.Lock()
+	var toResolve []*Alert
+	for key, a := range e.activeAlerts {
+		if key.EntityType == entityType && key.EntityID == entityID {
+			toResolve = append(toResolve, a)
+			delete(e.activeAlerts, key)
+		}
+	}
+	e.mu.Unlock()
+
+	for _, a := range toResolve {
+		if err := e.alertStore.UpdateAlertStatus(ctx, a.ID, StatusResolved, &now, nil); err != nil {
+			e.logger.Error("alert engine: resolve on entity removal", "error", err, "alert_id", a.ID)
+			continue
+		}
+		a.Status = StatusResolved
+		a.ResolvedAt = &now
+		e.broadcastResolved(a)
+		e.logger.Info("resolved alert for removed entity",
+			"alert_id", a.ID,
+			"entity_type", entityType,
+			"entity_id", entityID,
+		)
+	}
 }
 
 // AlertCount returns the number of active alerts (for monitoring).

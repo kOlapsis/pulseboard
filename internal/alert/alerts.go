@@ -8,7 +8,14 @@ import (
 	"github.com/kolapsis/pulseboard/internal/container"
 )
 
-const defaultRestartWindow = 10 * time.Minute
+const (
+	defaultRestartWindow = 10 * time.Minute
+
+	// CriticalRestartMultiplier is applied to the per-container restart
+	// threshold to determine when the alert escalates from warning to
+	// critical. E.g. threshold=3 → critical at 9 restarts in the window.
+	CriticalRestartMultiplier = 3
+)
 
 // RestartDetector checks for crash-loop restart patterns.
 type RestartDetector struct {

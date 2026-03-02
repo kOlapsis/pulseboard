@@ -392,10 +392,14 @@ func main() {
 		switch eventType {
 		case "container.restart_alert":
 			if ra, ok := data.(*alert.RestartAlert); ok && ra != nil {
+				severity := alert.SeverityWarning
+				if ra.RestartCount >= ra.Threshold*alert.CriticalRestartMultiplier {
+					severity = alert.SeverityCritical
+				}
 				sendAlert(alert.Event{
 					Source:     alert.SourceContainer,
 					AlertType:  "restart_loop",
-					Severity:   alert.SeverityWarning,
+					Severity:   severity,
 					Message:    fmt.Sprintf("Container %s exceeded restart threshold (%d/%d)", ra.ContainerName, ra.RestartCount, ra.Threshold),
 					EntityType: "container",
 					EntityID:   ra.ContainerID,
@@ -406,6 +410,24 @@ func main() {
 					},
 					Timestamp: ra.Timestamp,
 				})
+			}
+		case "container.restart_recovery":
+			if m, ok := data.(map[string]interface{}); ok {
+				sendAlert(alert.Event{
+					Source:     alert.SourceContainer,
+					AlertType:  "restart_loop",
+					Severity:   alert.SeverityInfo,
+					IsRecover:  true,
+					Message:    fmt.Sprintf("Container %s restart rate returned to normal", toString(m["container_name"])),
+					EntityType: "container",
+					EntityID:   toInt64(m["container_id"]),
+					EntityName: toString(m["container_name"]),
+					Timestamp:  time.Now(),
+				})
+			}
+		case "container.archived":
+			if m, ok := data.(map[string]interface{}); ok {
+				alertEngine.ResolveByEntity(ctx, "container", toInt64(m["id"]))
 			}
 		case "container.health_changed":
 			m, ok := data.(map[string]interface{})
@@ -662,6 +684,21 @@ func main() {
 	if err := svc.Reconcile(ctx, rt); err != nil {
 		logger.Error("startup reconciliation failed", "error", err)
 		// Non-fatal: continue with existing state
+	}
+
+	// Prune orphan container alerts — resolve active alerts whose container no
+	// longer exists (e.g. destroyed between PulseBoard restarts).
+	if activeAlerts, err := alertStore.ListActiveAlerts(ctx); err == nil {
+		for _, a := range activeAlerts {
+			if a.EntityType != "container" {
+				continue
+			}
+			c, err := svc.GetContainer(ctx, a.EntityID)
+			if err != nil || c == nil {
+				alertEngine.ResolveByEntity(ctx, "container", a.EntityID)
+				logger.Info("pruned orphan container alert", "alert_id", a.ID, "entity_id", a.EntityID)
+			}
+		}
 	}
 
 	// Discover endpoint labels from all containers (Docker-specific: uses DiscoverAllWithLabels)

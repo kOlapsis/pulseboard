@@ -288,15 +288,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
       else if (m.status === 'down') down++
       else if (m.status === 'warning') warning++
     }
-    // Use active alerts as the incident count — each active alert already
-    // represents a unique incident (endpoint down, cert error, etc.).
-    // Adding "down" monitors on top would double-count since they also
-    // generate an active alert.
-    const activeAlertCount =
-      (alertsStore.activeAlerts.critical?.length ?? 0) +
-      (alertsStore.activeAlerts.warning?.length ?? 0) +
-      (alertsStore.activeAlerts.info?.length ?? 0)
-    return { running, incidents: activeAlertCount, warnings: warning }
+    // Split alert severities: incidents = critical alerts, warnings = warning
+    // alerts. This avoids the confusing mix where restart-loop warnings were
+    // counted as "incidents" while the header "WARNINGS" counter only showed
+    // health-check unhealthy monitors.
+    const incidents = alertsStore.activeAlerts.critical?.length ?? 0
+    const warningAlerts = alertsStore.activeAlerts.warning?.length ?? 0
+    return { running, incidents, warnings: warning + warningAlerts }
   })
 
   return {
