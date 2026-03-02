@@ -22,13 +22,13 @@ const expandedId = ref<number | null>(null)
 const severityDotClasses: Record<string, string> = {
   critical: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]',
   warning: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]',
-  info: 'bg-blue-500',
+  info: 'bg-pb-green-500',
 }
 
 const severityBorderClasses: Record<string, string> = {
   critical: 'border-l-rose-500',
   warning: 'border-l-amber-500',
-  info: 'border-l-blue-500',
+  info: 'border-l-pb-green-500',
 }
 
 const timelineSteps = ['detected', 'alerted', 'acknowledged', 'resolved']
@@ -55,7 +55,7 @@ function formatFullTimestamp(ts: string): string {
 <template>
   <div
     v-if="incidents.length > 0 && !dismissed"
-    class="bg-[#151923] rounded-2xl border border-slate-800 p-4 mb-4 shadow-lg"
+    class="bg-[#12151C] rounded-2xl border border-slate-800 p-4 mb-4 shadow-lg"
   >
     <div class="flex items-center justify-between mb-3">
       <span class="text-sm font-bold text-rose-400">
@@ -147,7 +147,7 @@ function formatFullTimestamp(ts: string): string {
               :class="
                 incident.states.some(s => s.status === step)
                   ? severityDotClasses[incident.severity]
-                  : 'bg-[#151923] border-slate-700'
+                  : 'bg-[#12151C] border-slate-700'
               "
             />
 

@@ -45,3 +45,4 @@ site/
 CLAUDE.md
 .claude/
 pulseboard-*.md
+compose.local.yml

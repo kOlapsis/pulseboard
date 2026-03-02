@@ -76,22 +76,22 @@ onMounted(loadDetail)
 
 <template>
   <div v-if="loading" class="flex items-center justify-center py-12">
-    <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    <div class="w-6 h-6 border-2 border-pb-green-500 border-t-transparent rounded-full animate-spin" />
   </div>
 
   <div v-else-if="detail" class="space-y-5">
     <!-- Version info -->
-    <div class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+    <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
       <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Version</h4>
       <div class="flex items-center gap-3">
         <div class="text-center">
           <p class="text-xs text-slate-500 mb-0.5">Current</p>
           <p class="text-sm font-bold text-slate-200 font-mono">{{ detail.current_tag || 'latest' }}</p>
         </div>
-        <ArrowRight :size="16" class="text-blue-500 shrink-0" />
+        <ArrowRight :size="16" class="text-pb-green-500 shrink-0" />
         <div class="text-center">
           <p class="text-xs text-slate-500 mb-0.5">Available</p>
-          <p class="text-sm font-bold text-blue-400 font-mono">{{ detail.latest_tag }}</p>
+          <p class="text-sm font-bold text-pb-green-400 font-mono">{{ detail.latest_tag }}</p>
         </div>
       </div>
       <div class="mt-2 flex items-center gap-2">
@@ -100,7 +100,7 @@ onMounted(loadDetail)
           :class="{
             'bg-rose-500/10 text-rose-400': detail.update_type === 'major',
             'bg-amber-500/10 text-amber-400': detail.update_type === 'minor',
-            'bg-blue-500/10 text-blue-400': detail.update_type === 'patch',
+            'bg-pb-green-500/10 text-pb-green-400': detail.update_type === 'patch',
             'bg-slate-500/10 text-slate-400': detail.update_type === 'digest_only',
           }"
         >{{ detail.update_type }}</span>
@@ -112,7 +112,7 @@ onMounted(loadDetail)
 
     <!-- Risk Score (Pro) -->
     <FeatureGate feature="risk_scoring" title="Risk Score" description="Instantly assess the risk of each update. A smart score combines CVE severity, breaking changes, and version jump to help you prioritize.">
-      <div v-if="detail.risk_score > 0" class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+      <div v-if="detail.risk_score > 0" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
         <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Risk Score</h4>
         <RiskScoreGauge :score="detail.risk_score" :level="riskLevel" />
       </div>
@@ -120,7 +120,7 @@ onMounted(loadDetail)
 
     <!-- CVEs (Pro) -->
     <FeatureGate feature="cve_enrichment" title="Vulnerabilities (CVE)" description="See at a glance if your containers are exposed to known vulnerabilities. CVEs are automatically matched and ranked by severity.">
-      <div class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+      <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
         <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Vulnerabilities (CVE)</h4>
         <CveList :cves="detail.active_cves || []" />
       </div>
@@ -140,21 +140,21 @@ onMounted(loadDetail)
 
     <!-- Previous digest (Pro) -->
     <FeatureGate feature="cve_enrichment" title="Previous Digest" description="Keep a rollback safety net. The previous image digest is saved so you can revert in seconds if an update goes wrong.">
-      <div v-if="detail.previous_digest" class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+      <div v-if="detail.previous_digest" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
         <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Previous Digest</h4>
         <p class="text-[10px] text-slate-400 font-mono break-all">{{ detail.previous_digest }}</p>
         <p class="text-[10px] text-slate-600 mt-1">For manual rollback:</p>
-        <code class="text-[10px] text-blue-400 block mt-0.5">docker pull {{ detail.image.split(':')[0] }}@{{ detail.previous_digest }}</code>
+        <code class="text-[10px] text-pb-green-400 block mt-0.5">docker pull {{ detail.image.split(':')[0] }}@{{ detail.previous_digest }}</code>
       </div>
     </FeatureGate>
 
     <!-- Update command -->
-    <div v-if="detail.update_command" class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+    <div v-if="detail.update_command" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
       <div class="flex items-center justify-between mb-2">
         <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Update Command</h4>
         <button
           @click="copyCommand"
-          class="text-[10px] text-blue-500 hover:text-blue-400 flex items-center gap-1 transition-colors"
+          class="text-[10px] text-pb-green-500 hover:text-pb-green-400 flex items-center gap-1 transition-colors"
         >
           <component :is="copied ? Check : Copy" :size="10" />
           {{ copied ? 'Copied!' : 'Copy' }}
@@ -182,7 +182,7 @@ onMounted(loadDetail)
             v-model="pinReason"
             type="text"
             placeholder="Reason (optional)"
-            class="w-full px-3 py-2 bg-[#0f1115] border border-slate-700 rounded-lg text-xs text-slate-300 placeholder-slate-600 focus:border-blue-500 focus:outline-none"
+            class="w-full px-3 py-2 bg-[#0B0E13] border border-slate-700 rounded-lg text-xs text-slate-300 placeholder-slate-600 focus:border-pb-green-500 focus:outline-none"
           />
           <button
             @click="handlePin"

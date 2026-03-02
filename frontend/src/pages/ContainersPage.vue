@@ -61,12 +61,12 @@ function openDetail(container: Container) {
     <!-- Label tips info banner -->
     <div
       v-if="showLabelTips && store.runtimeConnected"
-      class="mb-6 rounded-2xl p-4 bg-blue-500/10 border border-blue-500/20"
+      class="mb-6 rounded-2xl p-4 bg-pb-green-500/10 border border-pb-green-500/20"
     >
       <div class="flex items-start gap-3">
-        <Info :size="20" class="text-blue-400 shrink-0 mt-0.5" />
+        <Info :size="20" class="text-pb-green-400 shrink-0 mt-0.5" />
         <div class="flex-1">
-          <h3 class="text-sm font-medium text-blue-300">Customize with {{ labelOrAnnotation }}s</h3>
+          <h3 class="text-sm font-medium text-pb-green-400">Customize with {{ labelOrAnnotation }}s</h3>
           <p class="mt-1 text-sm text-slate-400">
             Use {{ labelOrAnnotation }}s to configure container behavior:
             <code class="rounded-md px-1.5 py-0.5 text-xs bg-slate-900 text-slate-300">pulseboard.ignore</code> to hide a container,

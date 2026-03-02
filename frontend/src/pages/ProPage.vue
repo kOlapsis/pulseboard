@@ -60,7 +60,7 @@ const features = [
       <!-- Hero -->
       <div class="text-center mb-16">
         <div
-          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pb-green-500/10 border border-pb-green-500/20 text-pb-green-400 text-xs font-semibold mb-6"
         >
           <Crown :size="14" />
           Pro Edition
@@ -79,12 +79,12 @@ const features = [
         <div
           v-for="feature in features"
           :key="feature.title"
-          class="group bg-[#151923] border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
+          class="group bg-[#12151C] border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
         >
           <div
-            class="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-3"
+            class="w-9 h-9 rounded-lg bg-pb-green-500/10 border border-pb-green-500/20 flex items-center justify-center mb-3"
           >
-            <component :is="feature.icon" :size="18" class="text-blue-400" />
+            <component :is="feature.icon" :size="18" class="text-pb-green-400" />
           </div>
           <h3 class="text-sm font-semibold text-white mb-1.5">{{ feature.title }}</h3>
           <p class="text-xs text-slate-400 leading-relaxed">{{ feature.description }}</p>
@@ -109,7 +109,7 @@ const features = [
           </button>
           <button
             class="relative w-11 h-6 rounded-full transition-colors"
-            :class="billingPeriod === 'annual' ? 'bg-blue-600' : 'bg-slate-700'"
+            :class="billingPeriod === 'annual' ? 'bg-pb-green-600' : 'bg-slate-700'"
             @click="billingPeriod = billingPeriod === 'monthly' ? 'annual' : 'monthly'"
           >
             <span
@@ -135,10 +135,10 @@ const features = [
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <!-- Monthly -->
           <div
-            class="relative bg-[#151923] border rounded-xl p-6 transition-colors"
+            class="relative bg-[#12151C] border rounded-xl p-6 transition-colors"
             :class="
               billingPeriod === 'monthly'
-                ? 'border-blue-500/40'
+                ? 'border-pb-green-500/40'
                 : 'border-slate-800 opacity-60'
             "
           >
@@ -152,7 +152,7 @@ const features = [
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'monthly'
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                  ? 'bg-pb-green-600 hover:bg-pb-green-500 text-white shadow-lg shadow-pb-green-500/20'
                   : 'bg-slate-800 text-slate-400'
               "
             >
@@ -162,16 +162,16 @@ const features = [
 
           <!-- Annual -->
           <div
-            class="relative bg-[#151923] border rounded-xl p-6 transition-colors"
+            class="relative bg-[#12151C] border rounded-xl p-6 transition-colors"
             :class="
               billingPeriod === 'annual'
-                ? 'border-blue-500/40'
+                ? 'border-pb-green-500/40'
                 : 'border-slate-800 opacity-60'
             "
           >
             <span
               v-if="billingPeriod === 'annual'"
-              class="absolute -top-2.5 right-4 text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded"
+              class="absolute -top-2.5 right-4 text-[10px] font-bold bg-pb-green-600 text-white px-2 py-0.5 rounded"
             >
               Recommended
             </span>
@@ -186,7 +186,7 @@ const features = [
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'annual'
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                  ? 'bg-pb-green-600 hover:bg-pb-green-500 text-white shadow-lg shadow-pb-green-500/20'
                   : 'bg-slate-800 text-slate-400'
               "
             >
@@ -196,7 +196,7 @@ const features = [
         </div>
 
         <!-- Feature checklist -->
-        <div class="mt-8 bg-[#151923] border border-slate-800 rounded-xl p-6">
+        <div class="mt-8 bg-[#12151C] border border-slate-800 rounded-xl p-6">
           <h3 class="text-sm font-semibold text-white mb-4">Everything in Pro includes:</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div
@@ -204,15 +204,15 @@ const features = [
               :key="feature.title"
               class="flex items-center gap-2.5"
             >
-              <Check :size="14" class="text-blue-400 shrink-0" />
+              <Check :size="14" class="text-pb-green-400 shrink-0" />
               <span class="text-sm text-slate-300">{{ feature.title }}</span>
             </div>
             <div class="flex items-center gap-2.5">
-              <Check :size="14" class="text-blue-400 shrink-0" />
+              <Check :size="14" class="text-pb-green-400 shrink-0" />
               <span class="text-sm text-slate-300">All Community features</span>
             </div>
             <div class="flex items-center gap-2.5">
-              <Check :size="14" class="text-blue-400 shrink-0" />
+              <Check :size="14" class="text-pb-green-400 shrink-0" />
               <span class="text-sm text-slate-300">Priority support</span>
             </div>
           </div>

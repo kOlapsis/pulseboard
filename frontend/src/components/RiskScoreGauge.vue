@@ -30,7 +30,7 @@ const levelLabel = computed(() => {
       <span :class="['text-2xl font-black', gaugeColor.text]">{{ score }}</span>
       <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">{{ levelLabel }}</span>
     </div>
-    <div class="h-2 w-full bg-[#0f1115] rounded-full border border-slate-800 overflow-hidden">
+    <div class="h-2 w-full bg-[#0B0E13] rounded-full border border-slate-800 overflow-hidden">
       <div
         class="h-full rounded-full transition-all duration-500"
         :class="gaugeColor.bar"

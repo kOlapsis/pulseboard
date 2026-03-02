@@ -18,7 +18,7 @@ const enabled = computed(() => edition.value?.features[props.feature] === true)
   <template v-else-if="enabled === false">
     <slot name="placeholder">
       <!-- Default placeholder when no custom one is provided -->
-      <div v-if="title" class="relative w-full rounded-xl border border-zinc-800 bg-[#151923] px-5 py-5">
+      <div v-if="title" class="relative w-full rounded-xl border border-zinc-800 bg-[#12151C] px-5 py-5">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
             <div class="flex items-center gap-2 mb-1">

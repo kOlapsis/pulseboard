@@ -75,7 +75,7 @@ const panelWidth = computed(() => widthMap[props.width] || '32rem')
         <!-- Panel -->
         <div
           ref="panelRef"
-          class="fixed inset-y-0 right-0 flex flex-col bg-[#151923] shadow-2xl z-[9999]"
+          class="fixed inset-y-0 right-0 flex flex-col bg-[#12151C] shadow-2xl z-[9999]"
           :style="{ width: '100%', maxWidth: panelWidth }"
         >
           <!-- Header -->

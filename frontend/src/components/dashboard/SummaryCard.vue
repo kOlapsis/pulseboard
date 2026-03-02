@@ -18,7 +18,7 @@ const iconComponents: Record<string, typeof Box> = {
 }
 
 const iconColorClasses: Record<string, string> = {
-  box: 'text-blue-400',
+  box: 'text-pb-green-400',
   globe: 'text-indigo-400',
   heart: 'text-pink-400',
   shield: 'text-emerald-400',
@@ -28,7 +28,7 @@ const iconColorClasses: Record<string, string> = {
 <template>
   <RouterLink
     :to="link"
-    class="block bg-[#151923] p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all shadow-lg"
+    class="block bg-[#12151C] p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all shadow-lg"
   >
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-3">
@@ -37,7 +37,7 @@ const iconColorClasses: Record<string, string> = {
           <component
             :is="iconComponents[icon] || Box"
             :size="20"
-            :class="iconColorClasses[icon] || 'text-blue-400'"
+            :class="iconColorClasses[icon] || 'text-pb-green-400'"
           />
         </div>
         <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{{ title }}</span>

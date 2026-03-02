@@ -66,7 +66,7 @@ onUnmounted(() => {
     <div class="mb-6 flex flex-wrap gap-3">
       <select
         v-model="store.statusFilter"
-        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px]"
+        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-pb-green-500 min-h-[44px]"
       >
         <option value="">All statuses</option>
         <option value="up">Up</option>
@@ -76,7 +76,7 @@ onUnmounted(() => {
 
       <select
         v-model="store.typeFilter"
-        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px]"
+        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-pb-green-500 min-h-[44px]"
       >
         <option value="">All types</option>
         <option value="http">HTTP</option>
@@ -85,7 +85,7 @@ onUnmounted(() => {
 
       <select
         v-model="store.containerFilter"
-        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[44px]"
+        class="rounded-lg border border-slate-800 bg-slate-900 text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-pb-green-500 min-h-[44px]"
       >
         <option value="">All containers</option>
         <option
@@ -131,7 +131,7 @@ onUnmounted(() => {
       <!-- Endpoint grid — overlays on top -->
       <div
         v-if="store.filteredEndpoints.length > 0"
-        class="absolute inset-0 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 content-start bg-[#0f1115]"
+        class="absolute inset-0 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 content-start bg-[#0B0E13]"
       >
         <EndpointCard
           v-for="ep in store.filteredEndpoints"

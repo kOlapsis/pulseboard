@@ -113,19 +113,19 @@ function barColor(value: number): string {
 </script>
 
 <template>
-  <header class="hidden md:flex h-16 shrink-0 border-b border-slate-800 items-center justify-between px-6 bg-[#151923]/60 backdrop-blur-md z-10">
+  <header class="hidden md:flex h-16 shrink-0 border-b border-slate-800 items-center justify-between px-6 bg-[#12151C]/60 backdrop-blur-md z-10">
     <div class="flex items-center gap-5">
       <!-- Search -->
       <div class="relative group">
         <Search
           :size="15"
-          class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pb-green-400 transition-colors"
         />
         <input
           v-model="dashboard.searchQuery"
           type="text"
           placeholder="Search services..."
-          class="bg-[#0f1115] border border-slate-800 rounded-lg py-2 pl-9 pr-4 text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500/60 focus:border-blue-500/40 transition-all text-slate-200 placeholder:text-slate-600"
+          class="bg-[#0B0E13] border border-slate-800 rounded-lg py-2 pl-9 pr-4 text-sm w-72 focus:outline-none focus:ring-1 focus:ring-pb-green-500/60 focus:border-pb-green-500/40 transition-all text-slate-200 placeholder:text-slate-600"
         />
       </div>
 
@@ -239,7 +239,7 @@ function barColor(value: number): string {
         >
           <div
             v-if="bellOpen"
-            class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-700 bg-[#151923] shadow-2xl shadow-black/40 overflow-hidden z-50"
+            class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-700 bg-[#12151C] shadow-2xl shadow-black/40 overflow-hidden z-50"
             @mouseenter="onBellEnter"
             @mouseleave="onBellLeave"
           >
@@ -263,12 +263,12 @@ function barColor(value: number): string {
                   :is="sourceRouteMap[source]?.icon ?? AlertTriangle"
                   :size="14"
                   class="shrink-0"
-                  :class="alertsBySource[source]?.critical ? 'text-rose-400' : alertsBySource[source]?.warning ? 'text-amber-400' : 'text-blue-400'"
+                  :class="alertsBySource[source]?.critical ? 'text-rose-400' : alertsBySource[source]?.warning ? 'text-amber-400' : 'text-pb-green-400'"
                 />
                 <span class="flex-1 text-left">{{ sourceRouteMap[source]?.label ?? source }}</span>
                 <span
                   class="min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5"
-                  :class="alertsBySource[source]?.critical ? 'bg-rose-500/15 text-rose-400' : alertsBySource[source]?.warning ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'"
+                  :class="alertsBySource[source]?.critical ? 'bg-rose-500/15 text-rose-400' : alertsBySource[source]?.warning ? 'bg-amber-500/15 text-amber-400' : 'bg-pb-green-500/15 text-pb-green-400'"
                 >
                   {{ alertsBySource[source]?.count }}
                 </span>

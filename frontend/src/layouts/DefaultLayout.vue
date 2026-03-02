@@ -47,17 +47,15 @@ const mainNav = [
 </script>
 
 <template>
-  <div class="flex h-screen bg-[#0f1115] text-slate-200 antialiased overflow-hidden">
+  <div class="flex h-screen bg-[#0B0E13] text-slate-200 antialiased overflow-hidden">
     <!-- Desktop sidebar -->
     <aside
-      class="hidden md:flex md:w-64 md:flex-col md:shrink-0 bg-[#151923] border-r border-slate-800"
+      class="hidden md:flex md:w-64 md:flex-col md:shrink-0 bg-[#12151C] border-r border-slate-800"
     >
       <div class="flex flex-col flex-1 overflow-y-auto">
         <!-- Logo -->
         <div class="p-6 flex items-center gap-3 shrink-0">
-          <img src="/logo.svg" alt="PulseBoard"
-               class="w-8 h-8 rounded-lg shadow-lg shadow-blue-500/25"/>
-          <h1 class="text-xl font-bold tracking-tight text-white">PulseBoard</h1>
+          <img src="/logo.svg" alt="maintenant"/>
         </div>
 
         <!-- Main nav -->
@@ -69,7 +67,7 @@ const mainNav = [
             class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all border group"
             :class="[
               route.path.startsWith(item.to)
-                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                ? 'bg-pb-green-500/10 text-pb-green-400 border-pb-green-500/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border-transparent',
             ]"
           >
@@ -80,7 +78,7 @@ const mainNav = [
                 class="shrink-0 transition-colors"
                 :class="
                   route.path.startsWith(item.to)
-                    ? 'text-blue-400'
+                    ? 'text-pb-green-400'
                     : 'text-slate-500 group-hover:text-slate-300'
                 "
               />
@@ -100,7 +98,7 @@ const mainNav = [
                 class="text-[10px] px-1.5 py-0.5 rounded font-bold"
                 :class="isEnterprise
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'"
+                  : 'bg-pb-green-500/20 text-pb-green-400 border border-pb-green-500/30'"
               >{{ version }}</span>
             </div>
             <span
@@ -116,7 +114,7 @@ const mainNav = [
 
     <!-- Mobile top bar -->
     <div
-      class="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center h-14 px-4 bg-[#151923]/90 backdrop-blur-md border-b border-slate-800"
+      class="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center h-14 px-4 bg-[#12151C]/90 backdrop-blur-md border-b border-slate-800"
     >
       <button
         @click="mobileMenuOpen = !mobileMenuOpen"
@@ -146,7 +144,7 @@ const mainNav = [
     <Transition name="slide-left">
       <div
         v-if="mobileMenuOpen"
-        class="md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#151923] border-r border-slate-800 flex flex-col"
+        class="md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#12151C] border-r border-slate-800 flex flex-col"
       >
         <div class="p-6 flex items-center gap-3">
           <img src="/logo.svg" alt="PulseBoard" class="w-8 h-8 rounded-lg"/>
@@ -160,7 +158,7 @@ const mainNav = [
             class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all border"
             :class="[
               route.path.startsWith(item.to)
-                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                ? 'bg-pb-green-500/10 text-pb-green-400 border-pb-green-500/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border-transparent',
             ]"
             @click="closeMobileMenu"

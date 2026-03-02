@@ -10,7 +10,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+  <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
     <div class="flex items-center justify-between mb-2">
       <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Changelog</h4>
       <a
@@ -18,7 +18,7 @@ const props = defineProps<{
         :href="changelogUrl"
         target="_blank"
         rel="noopener noreferrer"
-        class="text-[10px] text-blue-500 hover:text-blue-400 flex items-center gap-1 transition-colors"
+        class="text-[10px] text-pb-green-500 hover:text-pb-green-400 flex items-center gap-1 transition-colors"
       >
         View release <ExternalLink :size="9" />
       </a>

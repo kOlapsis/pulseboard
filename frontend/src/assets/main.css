@@ -4,66 +4,95 @@
 
 /* T004: Color primitives + semantic tokens via Tailwind v4 @theme */
 @theme {
-  /* Gray scale */
-  --color-pb-gray-50: #f9fafb;
-  --color-pb-gray-100: #f3f4f6;
-  --color-pb-gray-200: #e5e7eb;
-  --color-pb-gray-300: #d1d5db;
-  --color-pb-gray-400: #9ca3af;
-  --color-pb-gray-500: #6b7280;
-  --color-pb-gray-600: #4b5563;
-  --color-pb-gray-700: #374151;
-  --color-pb-gray-800: #1e293b;
-  --color-pb-gray-850: #151923;
-  --color-pb-gray-900: #0f1115;
-  --color-pb-gray-950: #0b0d11;
+  /* Gray scale — override slate to match brand palette */
+  --color-slate-50: #F0F3FA;
+  --color-slate-100: #E8ECF4;
+  --color-slate-200: #C8CED9;
+  --color-slate-300: #A0A8B8;
+  --color-slate-400: #6B7590;
+  --color-slate-500: #4E5568;
+  --color-slate-600: #363D4E;
+  --color-slate-700: #252B38;
+  --color-slate-800: #1A1F2A;
+  --color-slate-900: #12151C;
+  --color-slate-950: #0B0E13;
+
+  /* Emerald — align with brand green */
+  --color-emerald-400: #4FD89E;
+  --color-emerald-500: #3ECF8E;
+  --color-emerald-600: #2EAF78;
+
+  /* Brand green (primary accent) */
+  --color-pb-green-400: #4FD89E;
+  --color-pb-green-500: #3ECF8E;
+  --color-pb-green-600: #2EAF78;
+  --color-pb-green-700: #1A9960;
+
+  /* Brand cyan (secondary accent) */
+  --color-pb-cyan-400: #33D8F0;
+  --color-pb-cyan-500: #22D3EE;
+  --color-pb-cyan-600: #0E8BA0;
+
+  /* Legacy aliases for pb-gray */
+  --color-pb-gray-50: #F0F3FA;
+  --color-pb-gray-100: #E8ECF4;
+  --color-pb-gray-200: #C8CED9;
+  --color-pb-gray-300: #A0A8B8;
+  --color-pb-gray-400: #6B7590;
+  --color-pb-gray-500: #4E5568;
+  --color-pb-gray-600: #363D4E;
+  --color-pb-gray-700: #252B38;
+  --color-pb-gray-800: #1A1F2A;
+  --color-pb-gray-850: #12151C;
+  --color-pb-gray-900: #0B0E13;
+  --color-pb-gray-950: #070A0F;
 
   /* Status colors (spec-aligned) */
-  --color-pb-green-500: #10b981;
+  --color-pb-green-500: #3ECF8E;
   --color-pb-red-500: #f43f5e;
   --color-pb-yellow-500: #f59e0b;
   --color-pb-orange-500: #f97316;
-  --color-pb-blue-500: #3b82f6;
+  --color-pb-blue-500: #22D3EE;
 }
 
 /* Dark theme (default) */
 @layer base {
   :root {
-    /* Semantic: backgrounds — spec tokens */
-    --pb-bg-primary: #0f1115;
-    --pb-bg-surface: #151923;
-    --pb-bg-elevated: #1e293b;
-    --pb-bg-hover: #334155;
+    /* Semantic: backgrounds */
+    --pb-bg-primary: #0B0E13;
+    --pb-bg-surface: #12151C;
+    --pb-bg-elevated: #1A1F2A;
+    --pb-bg-hover: #252B38;
 
     /* Semantic: text */
-    --pb-text-primary: #f9fafb;
-    --pb-text-secondary: #d1d5db;
-    --pb-text-muted: #64748b;
-    --pb-text-inverted: #0f1115;
+    --pb-text-primary: #E8ECF4;
+    --pb-text-secondary: #A0A8B8;
+    --pb-text-muted: #6B7590;
+    --pb-text-inverted: #0B0E13;
 
-    /* Semantic: borders — slate-800 */
-    --pb-border-default: #1e293b;
-    --pb-border-subtle: #1e293b;
+    /* Semantic: borders */
+    --pb-border-default: #1A1F2A;
+    --pb-border-subtle: #161B25;
 
-    /* Accent */
-    --pb-accent: #3b82f6;
-    --pb-accent-hover: #2563eb;
+    /* Accent — brand green */
+    --pb-accent: #3ECF8E;
+    --pb-accent-hover: #2EAF78;
 
-    /* Status semantic — spec-aligned */
-    --pb-status-ok: #10b981;
+    /* Status semantic */
+    --pb-status-ok: #3ECF8E;
     --pb-status-warn: #f59e0b;
     --pb-status-critical: #f97316;
     --pb-status-down: #f43f5e;
-    --pb-status-paused: #64748b;
+    --pb-status-paused: #6B7590;
 
     /* Status backgrounds (muted) */
-    --pb-status-ok-bg: rgba(16, 185, 129, 0.15);
+    --pb-status-ok-bg: rgba(62, 207, 142, 0.15);
     --pb-status-warn-bg: rgba(245, 158, 11, 0.15);
     --pb-status-critical-bg: rgba(249, 115, 22, 0.15);
     --pb-status-down-bg: rgba(244, 63, 94, 0.15);
 
     /* Status glow shadows */
-    --pb-glow-ok: 0 0 8px rgba(16, 185, 129, 0.5);
+    --pb-glow-ok: 0 0 8px rgba(62, 207, 142, 0.5);
     --pb-glow-down: 0 0 8px rgba(244, 63, 94, 0.5);
     --pb-glow-warn: 0 0 8px rgba(245, 158, 11, 0.4);
 

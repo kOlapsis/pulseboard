@@ -98,7 +98,7 @@ const filteredServices = computed(() => {
 
 // Status dot style with pulse animation
 function statusDotClass(status: string): string {
-  if (status === 'ok') return 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse'
+  if (status === 'ok') return 'bg-emerald-500 shadow-[0_0_8px_rgba(62,207,142,0.5)] animate-pulse'
   if (status === 'down') return 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)] animate-pulse'
   if (status === 'warning') return 'bg-amber-500 animate-pulse'
   return 'bg-slate-500'
@@ -130,7 +130,7 @@ const memPercent = computed(() => {
 function gaugeBarColor(val: number, thresholds = { warn: 60, crit: 80 }): string {
   if (val > thresholds.crit) return 'bg-rose-500'
   if (val > thresholds.warn) return 'bg-amber-500'
-  return 'bg-blue-500'
+  return 'bg-pb-green-500'
 }
 
 // Unified incident feed: active alerts + status page incidents
@@ -156,7 +156,7 @@ const incidentFeed = computed(() => {
     const color =
       alert.severity === 'critical' ? 'bg-rose-500' :
       alert.severity === 'warning'  ? 'bg-amber-500' :
-      'bg-blue-500'
+      'bg-pb-green-500'
     const route = alertEntityRoute(alert)
     items.push({
       id: `alert-${alert.id}`,
@@ -175,7 +175,7 @@ const incidentFeed = computed(() => {
       inc.severity === 'critical' ? 'bg-rose-500' :
       inc.severity === 'major'    ? 'bg-rose-500' :
       inc.severity === 'minor'    ? 'bg-amber-500' :
-      'bg-blue-400'
+      'bg-pb-green-400'
     items.push({
       id: `inc-${inc.id}`,
       service: inc.title,
@@ -237,7 +237,7 @@ const summaryCards = computed(() => {
       trend: null,
       trendUp: null,
       icon: Activity,
-      iconColor: 'text-blue-500',
+      iconColor: 'text-pb-green-500',
       valueColor: 'text-white',
     },
     {
@@ -267,7 +267,7 @@ const summaryCards = computed(() => {
       trend: null,
       trendUp: null,
       icon: Shield,
-      iconColor: 'text-blue-400',
+      iconColor: 'text-pb-green-400',
       valueColor: certExpiring > 0 ? 'text-rose-400' : 'text-white',
     },
   ]
@@ -296,10 +296,10 @@ onUnmounted(() => {
           <div
             v-for="card in summaryCards"
             :key="card.title"
-            class="bg-[#151923] p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all shadow-lg group cursor-default"
+            class="bg-[#12151C] p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all shadow-lg group cursor-default"
           >
             <div class="flex justify-between items-start mb-4">
-              <div class="p-2.5 bg-[#0f1115] rounded-xl group-hover:scale-105 transition-transform">
+              <div class="p-2.5 bg-[#0B0E13] rounded-xl group-hover:scale-105 transition-transform">
                 <component :is="card.icon" :size="18" :class="card.iconColor" />
               </div>
               <span
@@ -324,7 +324,7 @@ onUnmounted(() => {
         <UpdateSummaryStrip />
 
         <!-- Monitor Table -->
-        <div class="bg-[#151923] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+        <div class="bg-[#12151C] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
           <!-- Table header -->
           <div class="px-6 py-5 border-b border-slate-800 flex justify-between items-center">
             <div>
@@ -337,17 +337,17 @@ onUnmounted(() => {
                 :class="[
                   'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 border',
                   hasActiveFilters
-                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/40 hover:bg-blue-600/30'
+                    ? 'bg-pb-green-600/20 text-pb-green-400 border-pb-green-500/40 hover:bg-pb-green-600/30'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700',
                 ]"
               >
                 <Filter :size="13" />
                 Filter
-                <span v-if="hasActiveFilters" class="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                <span v-if="hasActiveFilters" class="w-1.5 h-1.5 rounded-full bg-pb-green-400" />
               </button>
               <RouterLink
                 to="/heartbeats"
-                class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                class="px-3.5 py-1.5 bg-pb-green-600 hover:bg-pb-green-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-pb-green-500/20"
               >
                 <Zap :size="13" class="fill-white" />
                 Add monitor
@@ -356,16 +356,16 @@ onUnmounted(() => {
           </div>
 
           <!-- Filter bar -->
-          <div v-if="filterOpen" class="px-6 py-4 border-b border-slate-800 bg-[#0f1115]/40 flex flex-wrap items-center gap-3">
+          <div v-if="filterOpen" class="px-6 py-4 border-b border-slate-800 bg-[#0B0E13]/40 flex flex-wrap items-center gap-3">
             <input
               v-model="filterSearch"
               type="text"
               placeholder="Search monitors..."
-              class="px-3 py-1.5 bg-[#0f1115] border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 w-52"
+              class="px-3 py-1.5 bg-[#0B0E13] border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-pb-green-500 w-52"
             />
             <select
               v-model="filterType"
-              class="px-3 py-1.5 bg-[#0f1115] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500 appearance-none cursor-pointer"
+              class="px-3 py-1.5 bg-[#0B0E13] border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-pb-green-500 appearance-none cursor-pointer"
             >
               <option value="">All types</option>
               <option value="container">Container</option>
@@ -379,7 +379,7 @@ onUnmounted(() => {
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
                 filterIncidents
                   ? 'bg-rose-500/15 text-rose-400 border-rose-500/40'
-                  : 'bg-[#0f1115] text-slate-400 border-slate-700 hover:border-slate-600',
+                  : 'bg-[#0B0E13] text-slate-400 border-slate-700 hover:border-slate-600',
               ]"
             >
               Incidents only
@@ -400,7 +400,7 @@ onUnmounted(() => {
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-[#0f1115]/60 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-800/60">
+                <tr class="bg-[#0B0E13]/60 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-800/60">
                   <th class="px-6 py-3.5">Status / Name</th>
                   <th class="px-6 py-3.5">Type</th>
                   <th class="px-6 py-3.5">Details / Resources</th>
@@ -420,7 +420,7 @@ onUnmounted(() => {
                     <div class="flex items-center gap-4">
                       <div :class="['w-2.5 h-2.5 rounded-full shrink-0', statusDotClass(service.status)]" />
                       <div class="min-w-0">
-                        <p class="text-sm font-semibold text-slate-100 group-hover:text-blue-400 transition-colors truncate">
+                        <p class="text-sm font-semibold text-slate-100 group-hover:text-pb-green-400 transition-colors truncate">
                           {{ service.name }}
                         </p>
                         <p class="text-[10px] text-slate-600 mt-0.5 flex items-center gap-1 truncate">
@@ -454,7 +454,7 @@ onUnmounted(() => {
                         <p class="text-slate-600 uppercase tracking-tighter">{{ service.metricLabel }}</p>
                       </div>
                     </div>
-                    <div v-else-if="service.metricValue" class="text-[10px] font-mono text-blue-400 font-bold">
+                    <div v-else-if="service.metricValue" class="text-[10px] font-mono text-pb-green-400 font-bold">
                       {{ service.metricValue }}
                       <p class="text-[9px] text-slate-600 uppercase tracking-tighter mt-0.5">{{ service.metricLabel }}</p>
                     </div>
@@ -515,15 +515,15 @@ onUnmounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           <!-- Incident Activity Feed -->
-          <div class="lg:col-span-2 bg-[#151923] rounded-2xl border border-slate-800 p-6">
+          <div class="lg:col-span-2 bg-[#12151C] rounded-2xl border border-slate-800 p-6">
             <div class="flex justify-between items-center mb-5">
               <h3 class="text-sm font-bold text-white flex items-center gap-2.5">
-                <Activity :size="15" class="text-blue-500" />
+                <Activity :size="15" class="text-pb-green-500" />
                 Incident Activity Feed
               </h3>
               <RouterLink
                 to="/alerts"
-                class="text-[10px] text-blue-500 hover:text-blue-400 font-bold uppercase tracking-widest transition-colors"
+                class="text-[10px] text-pb-green-500 hover:text-pb-green-400 font-bold uppercase tracking-widest transition-colors"
               >
                 View full history
               </RouterLink>
@@ -542,7 +542,7 @@ onUnmounted(() => {
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex justify-between items-center mb-0.5">
-                    <span class="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition-colors tracking-tight truncate mr-3">{{ inc.service }}</span>
+                    <span class="text-xs font-semibold text-slate-200 group-hover:text-pb-green-400 transition-colors tracking-tight truncate mr-3">{{ inc.service }}</span>
                     <span class="text-[10px] text-slate-600 font-bold shrink-0">{{ inc.time }}</span>
                   </div>
                   <p class="text-[11px] text-slate-500 truncate">{{ inc.message }}</p>
@@ -561,7 +561,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Host Resources -->
-          <div class="bg-[#151923] rounded-2xl border border-slate-800 p-6">
+          <div class="bg-[#12151C] rounded-2xl border border-slate-800 p-6">
             <div class="flex items-center gap-2.5 mb-5">
               <Server :size="15" class="text-emerald-500" />
               <h3 class="text-sm font-bold text-white">Host Resources</h3>
@@ -574,7 +574,7 @@ onUnmounted(() => {
                   <span class="text-slate-500">CPU Usage</span>
                   <span class="text-slate-200">{{ Math.round(totalCpu) }}%</span>
                 </div>
-                <div class="h-1.5 w-full bg-[#0f1115] rounded-full border border-slate-800 overflow-hidden">
+                <div class="h-1.5 w-full bg-[#0B0E13] rounded-full border border-slate-800 overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-700"
                     :class="gaugeBarColor(totalCpu)"
@@ -591,7 +591,7 @@ onUnmounted(() => {
                     {{ resources.formatBytes(totalMemUsed) }} / {{ resources.formatBytes(totalMemLimit) }}
                   </span>
                 </div>
-                <div class="h-1.5 w-full bg-[#0f1115] rounded-full border border-slate-800 overflow-hidden">
+                <div class="h-1.5 w-full bg-[#0B0E13] rounded-full border border-slate-800 overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-700"
                     :class="gaugeBarColor(memPercent, { warn: 70, crit: 85 })"
@@ -626,14 +626,14 @@ onUnmounted(() => {
     <SlideOverPanel v-model:open="slideOpen" :title="selectedService?.name || ''">
       <template v-if="selectedService">
         <div class="grid grid-cols-2 gap-3 mb-6">
-          <div class="bg-[#0f1115] p-4 rounded-xl border border-slate-800">
+          <div class="bg-[#0B0E13] p-4 rounded-xl border border-slate-800">
             <p class="text-[10px] text-slate-500 font-bold uppercase mb-1.5 tracking-widest">Status</p>
             <div class="flex items-center gap-2">
               <div :class="['w-2.5 h-2.5 rounded-full', statusDotClass(selectedService.status)]" />
               <p class="text-white font-semibold text-sm">{{ selectedService.statusLabel }}</p>
             </div>
           </div>
-          <div v-if="selectedService.metricValue" class="bg-[#0f1115] p-4 rounded-xl border border-slate-800">
+          <div v-if="selectedService.metricValue" class="bg-[#0B0E13] p-4 rounded-xl border border-slate-800">
             <p class="text-[10px] text-slate-500 font-bold uppercase mb-1.5 tracking-widest">{{ selectedService.metricLabel || 'Metric' }}</p>
             <p class="text-white font-semibold text-sm font-mono">{{ selectedService.metricValue }}</p>
           </div>
@@ -642,7 +642,7 @@ onUnmounted(() => {
         <div class="space-y-3 mb-6">
           <div>
             <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Details</h4>
-            <div class="bg-[#0f1115] rounded-xl p-4 border border-slate-800 space-y-2.5">
+            <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800 space-y-2.5">
               <div class="flex justify-between text-xs">
                 <span class="text-slate-500">Type</span>
                 <span class="text-slate-300 capitalize">{{ selectedService.type }}</span>
@@ -661,7 +661,7 @@ onUnmounted(() => {
 
         <div v-if="selectedService.sparklineData && selectedService.sparklineData.length > 1" class="mb-6">
           <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Trend</h4>
-          <div class="bg-[#0f1115] rounded-xl p-4 border border-slate-800">
+          <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
             <SparklineChart
               :data="selectedService.sparklineData"
               :width="320"
@@ -675,7 +675,7 @@ onUnmounted(() => {
         <div class="pt-5 border-t border-slate-800 flex gap-3">
           <RouterLink
             :to="selectedService.link"
-            class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg text-center"
+            class="flex-1 py-2.5 bg-pb-green-600 hover:bg-pb-green-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg text-center"
             @click="slideOpen = false"
           >
             View details

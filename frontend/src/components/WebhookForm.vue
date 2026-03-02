@@ -5,40 +5,40 @@
 
       <form @submit.prevent="submit" class="space-y-4">
         <div>
-          <label class="block text-sm text-gray-400 mb-1">Name</label>
+          <label class="block text-sm text-slate-400 mb-1">Name</label>
           <input
             v-model="name"
             type="text"
             maxlength="100"
             required
             placeholder="e.g., Slack Integration"
-            class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-pb-green-500 focus:outline-none"
           />
         </div>
 
         <div>
-          <label class="block text-sm text-gray-400 mb-1">URL (HTTPS)</label>
+          <label class="block text-sm text-slate-400 mb-1">URL (HTTPS)</label>
           <input
             v-model="url"
             type="url"
             required
             placeholder="https://hooks.example.com/webhook"
-            class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-pb-green-500 focus:outline-none"
           />
         </div>
 
         <div>
-          <label class="block text-sm text-gray-400 mb-1">Secret (optional, for HMAC signing)</label>
+          <label class="block text-sm text-slate-400 mb-1">Secret (optional, for HMAC signing)</label>
           <input
             v-model="secret"
             type="text"
             placeholder="Optional signing secret"
-            class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-pb-green-500 focus:outline-none"
           />
         </div>
 
         <div>
-          <label class="block text-sm text-gray-400 mb-2">Event Types</label>
+          <label class="block text-sm text-slate-400 mb-2">Event Types</label>
           <div class="space-y-2">
             <label class="flex items-center gap-2">
               <input
@@ -46,9 +46,9 @@
                 value="*"
                 v-model="selectedEvents"
                 @change="onAllEventsToggle"
-                class="rounded border-gray-600 bg-gray-900 text-blue-600"
+                class="rounded border-slate-600 bg-slate-900 text-pb-green-500"
               />
-              <span class="text-sm text-gray-300">All events</span>
+              <span class="text-sm text-slate-300">All events</span>
             </label>
             <label v-for="et in specificEventTypes" :key="et.value" class="flex items-center gap-2 ml-4">
               <input
@@ -56,9 +56,9 @@
                 :value="et.value"
                 v-model="selectedEvents"
                 :disabled="selectedEvents.includes('*')"
-                class="rounded border-gray-600 bg-gray-900 text-blue-600"
+                class="rounded border-slate-600 bg-slate-900 text-pb-green-500"
               />
-              <span class="text-sm text-gray-300">{{ et.label }}</span>
+              <span class="text-sm text-slate-300">{{ et.label }}</span>
             </label>
           </div>
         </div>
@@ -69,14 +69,14 @@
           <button
             type="button"
             @click="$emit('close')"
-            class="text-sm text-gray-400 hover:text-gray-300 px-4 py-2"
+            class="text-sm text-slate-400 hover:text-slate-300 px-4 py-2"
           >
             Cancel
           </button>
           <button
             type="submit"
             :disabled="submitting || !name || !url || selectedEvents.length === 0"
-            class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded px-4 py-2 text-sm font-medium"
+            class="bg-pb-green-600 hover:bg-pb-green-700 disabled:opacity-50 text-white rounded px-4 py-2 text-sm font-medium"
           >
             {{ submitting ? 'Creating...' : 'Add Webhook' }}
           </button>

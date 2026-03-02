@@ -88,7 +88,7 @@ const globalBanner = computed(() => {
   if (s === 'degraded') return { bg: 'bg-amber-500', text: 'Degraded Performance', icon: '⚠' }
   if (s === 'partial_outage') return { bg: 'bg-amber-500', text: 'Partial Outage', icon: '⚠' }
   if (s === 'major_outage') return { bg: 'bg-rose-500', text: 'Major Outage', icon: '✕' }
-  if (s === 'under_maintenance') return { bg: 'bg-blue-500', text: 'Under Maintenance', icon: '⚙' }
+  if (s === 'under_maintenance') return { bg: 'bg-pb-green-500', text: 'Under Maintenance', icon: '⚙' }
   return { bg: 'bg-slate-600', text: data.value?.global_message || 'Loading…', icon: '·' }
 })
 
@@ -96,7 +96,7 @@ const incidentSeverityStyle = (severity: string) => {
   if (severity === 'critical') return 'border-rose-500/40 bg-rose-500/5'
   if (severity === 'major') return 'border-rose-500/40 bg-rose-500/5'
   if (severity === 'minor') return 'border-amber-500/40 bg-amber-500/5'
-  return 'border-blue-500/40 bg-blue-500/5'
+  return 'border-pb-green-500/40 bg-pb-green-500/5'
 }
 
 const incidentStatusLabel = (status: string) => {
@@ -115,7 +115,7 @@ const componentStatusStyle = (status: string) => {
     degraded: { dot: 'bg-amber-500', label: 'Degraded Performance', text: 'text-amber-400' },
     partial_outage: { dot: 'bg-amber-500', label: 'Partial Outage', text: 'text-amber-400' },
     major_outage: { dot: 'bg-rose-500', label: 'Major Outage', text: 'text-rose-400' },
-    under_maintenance: { dot: 'bg-blue-500', label: 'Under Maintenance', text: 'text-blue-400' },
+    under_maintenance: { dot: 'bg-pb-green-500', label: 'Under Maintenance', text: 'text-pb-green-400' },
   }
   return styles[status] || { dot: 'bg-slate-500', label: status, text: 'text-slate-400' }
 }
@@ -128,18 +128,11 @@ function formatDate(iso: string) {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: #0f1115; color: #e2e8f0">
+  <div class="min-h-screen" style="background: #0B0E13; color: #E8ECF4">
     <!-- Header -->
-    <header class="border-b border-slate-800 bg-[#151923]">
+    <header class="border-b border-slate-800 bg-[#12151C]">
       <div class="mx-auto max-w-3xl px-6 py-5 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-          </div>
-          <span class="text-base font-bold text-white">PulseBoard</span>
-        </div>
+        <img src="/logo.svg" alt="maintenant"/>
         <span class="text-xs text-slate-500 font-medium">Public Status Page</span>
       </div>
     </header>
@@ -152,7 +145,7 @@ function formatDate(iso: string) {
 
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center items-center py-24">
-      <div class="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-blue-500" />
+      <div class="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-pb-green-500" />
     </div>
 
     <!-- Error -->
@@ -184,7 +177,7 @@ function formatDate(iso: string) {
                 v-if="data.groups.length > 1 && group.name !== 'Other'"
                 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3"
               >{{ group.name }}</h2>
-              <div class="rounded-xl border border-slate-800 bg-[#151923] divide-y divide-slate-800">
+              <div class="rounded-xl border border-slate-800 bg-[#12151C] divide-y divide-slate-800">
                 <div
                   v-for="comp in group.components"
                   :key="comp.id"
@@ -246,11 +239,11 @@ function formatDate(iso: string) {
             <div
               v-for="maint in data.upcoming_maintenance"
               :key="maint.id"
-              class="rounded-xl border border-blue-500/30 bg-blue-500/5 p-5"
+              class="rounded-xl border border-pb-green-500/30 bg-pb-green-500/5 p-5"
             >
               <div class="flex items-start justify-between gap-3 mb-1">
                 <span class="font-semibold text-slate-100 text-sm">{{ maint.title }}</span>
-                <span class="shrink-0 text-[10px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 font-medium">
+                <span class="shrink-0 text-[10px] px-2 py-0.5 rounded bg-pb-green-500/15 text-pb-green-400 border border-pb-green-500/30 font-medium">
                   Scheduled
                 </span>
               </div>

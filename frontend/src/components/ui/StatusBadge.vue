@@ -40,7 +40,7 @@ const statusLabels: Record<BadgeStatus, string> = {
 }
 
 const statusDotClasses: Record<BadgeStatus, string> = {
-  ok: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]',
+  ok: 'bg-emerald-500 shadow-[0_0_8px_rgba(62,207,142,0.5)]',
   warning: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]',
   critical: 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]',
   down: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]',

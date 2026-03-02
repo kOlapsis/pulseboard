@@ -13,7 +13,7 @@ function barColor(pct: number): string {
 
 <template>
   <div class="flex items-center gap-2">
-    <span v-if="label" class="w-8 text-xs text-gray-500">{{ label }}</span>
+    <span v-if="label" class="w-8 text-xs text-slate-500">{{ label }}</span>
     <div v-if="percentage !== null" class="flex flex-1 items-center gap-2">
       <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
         <div
@@ -22,10 +22,10 @@ function barColor(pct: number): string {
           :style="{ width: `${Math.min(percentage, 100)}%` }"
         />
       </div>
-      <span class="w-12 text-right text-xs font-medium text-gray-600">
+      <span class="w-12 text-right text-xs font-medium text-slate-600">
         {{ percentage.toFixed(1) }}%
       </span>
     </div>
-    <span v-else class="text-xs text-gray-400">--</span>
+    <span v-else class="text-xs text-slate-400">--</span>
   </div>
 </template>

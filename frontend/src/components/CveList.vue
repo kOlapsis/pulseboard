@@ -27,7 +27,7 @@ function getSeverityStyle(sev: string) {
     <div
       v-for="cve in cves"
       :key="cve.cve_id"
-      class="bg-[#0f1115] rounded-xl p-3 border border-slate-800"
+      class="bg-[#0B0E13] rounded-xl p-3 border border-slate-800"
     >
       <div class="flex items-center justify-between mb-1">
         <div class="flex items-center gap-2">

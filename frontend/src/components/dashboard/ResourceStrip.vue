@@ -49,13 +49,13 @@ const topConsumers = computed(() => {
 function cpuBarColor(val: number): string {
   if (val > 80) return 'bg-rose-500'
   if (val > 60) return 'bg-amber-500'
-  return 'bg-blue-500'
+  return 'bg-pb-green-500'
 }
 
 function memBarColor(val: number): string {
   if (val > 85) return 'bg-rose-500'
   if (val > 70) return 'bg-amber-500'
-  return 'bg-blue-500'
+  return 'bg-pb-green-500'
 }
 
 
@@ -64,7 +64,7 @@ function memBarColor(val: number): string {
 <template>
   <div
     v-if="containerCount > 0"
-    class="mb-4 flex flex-wrap items-center gap-5 bg-[#151923] rounded-2xl border border-slate-800 px-5 py-3"
+    class="mb-4 flex flex-wrap items-center gap-5 bg-[#12151C] rounded-2xl border border-slate-800 px-5 py-3"
   >
     <!-- CPU gauge -->
     <div class="flex items-center gap-2.5 min-w-[160px]">

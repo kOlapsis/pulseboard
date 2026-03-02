@@ -59,11 +59,11 @@ async function save() {
 <template>
   <div class="rounded border border-gray-200 bg-white p-4">
     <div class="mb-3 flex items-center justify-between">
-      <h4 class="text-sm font-semibold text-gray-700">Resource Alerts</h4>
+      <h4 class="text-sm font-semibold text-slate-700">Resource Alerts</h4>
       <span
         v-if="config"
         class="text-xs font-medium"
-        :class="alertStateColors[config.alert_state] || 'text-gray-500'"
+        :class="alertStateColors[config.alert_state] || 'text-slate-500'"
       >
         {{ config.alert_state }}
       </span>
@@ -73,12 +73,12 @@ async function save() {
       <!-- Enable toggle -->
       <label class="flex items-center gap-2 text-sm">
         <input v-model="enabled" type="checkbox" class="rounded border-gray-300" />
-        <span class="text-gray-700">Enable alerts</span>
+        <span class="text-slate-700">Enable alerts</span>
       </label>
 
       <!-- CPU threshold -->
       <div>
-        <label class="block text-xs text-gray-500">CPU Threshold (%)</label>
+        <label class="block text-xs text-slate-500">CPU Threshold (%)</label>
         <div class="flex items-center gap-2">
           <input
             v-model.number="cpuThreshold"
@@ -99,7 +99,7 @@ async function save() {
 
       <!-- Memory threshold -->
       <div>
-        <label class="block text-xs text-gray-500">Memory Threshold (%)</label>
+        <label class="block text-xs text-slate-500">Memory Threshold (%)</label>
         <div class="flex items-center gap-2">
           <input
             v-model.number="memThreshold"
@@ -121,7 +121,7 @@ async function save() {
       <!-- Save button -->
       <div class="flex items-center gap-2">
         <button
-          class="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          class="rounded bg-pb-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-pb-green-700 disabled:opacity-50"
           :disabled="saving"
           @click="save"
         >

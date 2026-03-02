@@ -21,10 +21,10 @@ const formatTime = timeAgo
 </script>
 
 <template>
-  <div class="bg-[#151923] rounded-2xl border border-slate-800 p-5">
+  <div class="bg-[#12151C] rounded-2xl border border-slate-800 p-5">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2.5">
-        <ArrowUpCircle :size="15" class="text-blue-500" />
+        <ArrowUpCircle :size="15" class="text-pb-green-500" />
         <h3 class="text-sm font-bold text-white">Updates</h3>
       </div>
       <div class="flex items-center gap-3">
@@ -34,7 +34,7 @@ const formatTime = timeAgo
         <button
           @click="updates.startScan()"
           :disabled="updates.scanning"
-          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-blue-500/20"
+          class="px-3 py-1.5 bg-pb-green-600 hover:bg-pb-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-pb-green-500/20"
         >
           <RefreshCw :size="11" :class="{ 'animate-spin': updates.scanning }" />
           {{ updates.scanning ? 'Scan...' : 'Check' }}
@@ -44,7 +44,7 @@ const formatTime = timeAgo
 
     <div v-if="updates.summary?.counts" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <!-- Critical -->
-      <RouterLink :to="{ name: 'updates' }" class="bg-[#0f1115] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
+      <RouterLink :to="{ name: 'updates' }" class="bg-[#0B0E13] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
         <div class="flex items-center gap-1.5 mb-1">
           <AlertTriangle :size="11" class="text-rose-500" />
           <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Critical</span>
@@ -55,7 +55,7 @@ const formatTime = timeAgo
       </RouterLink>
 
       <!-- Recommended -->
-      <RouterLink :to="{ name: 'updates' }" class="bg-[#0f1115] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
+      <RouterLink :to="{ name: 'updates' }" class="bg-[#0B0E13] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
         <div class="flex items-center gap-1.5 mb-1">
           <ArrowUpCircle :size="11" class="text-amber-500" />
           <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Recommended</span>
@@ -66,18 +66,18 @@ const formatTime = timeAgo
       </RouterLink>
 
       <!-- Available -->
-      <RouterLink :to="{ name: 'updates' }" class="bg-[#0f1115] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
+      <RouterLink :to="{ name: 'updates' }" class="bg-[#0B0E13] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
         <div class="flex items-center gap-1.5 mb-1">
-          <ArrowUpCircle :size="11" class="text-blue-500" />
+          <ArrowUpCircle :size="11" class="text-pb-green-500" />
           <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Available</span>
         </div>
-        <p class="text-xl font-black" :class="updates.summary.counts.available > 0 ? 'text-blue-400' : 'text-slate-600'">
+        <p class="text-xl font-black" :class="updates.summary.counts.available > 0 ? 'text-pb-green-400' : 'text-slate-600'">
           {{ updates.summary.counts.available }}
         </p>
       </RouterLink>
 
       <!-- Up to date -->
-      <RouterLink :to="{ name: 'updates' }" class="bg-[#0f1115] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
+      <RouterLink :to="{ name: 'updates' }" class="bg-[#0B0E13] rounded-xl p-3 border border-slate-800 hover:border-slate-700 transition-colors">
         <div class="flex items-center gap-1.5 mb-1">
           <CheckCircle :size="11" class="text-emerald-500" />
           <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Up to date</span>
