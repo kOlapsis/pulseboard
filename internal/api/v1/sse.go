@@ -1,3 +1,14 @@
+// Copyright 2026 Benjamin Touchard (kOlapsis)
+//
+// Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+// or a commercial license. You may not use this file except in compliance
+// with one of these licenses.
+//
+// AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
+// Commercial: See LICENSE-COMMERCIAL.md
+//
+// Source: https://github.com/kolapsis/maintenant
+
 package v1
 
 import (
@@ -82,13 +93,13 @@ const (
 
 // SSE event type constants for public status page.
 const (
-	EventStatusComponentChanged  = "status.component_changed"
-	EventStatusIncidentCreated   = "status.incident_created"
-	EventStatusIncidentUpdated   = "status.incident_updated"
-	EventStatusIncidentResolved  = "status.incident_resolved"
-	EventStatusMaintenanceStart  = "status.maintenance_started"
-	EventStatusMaintenanceEnd    = "status.maintenance_ended"
-	EventStatusGlobalChanged     = "status.global_changed"
+	EventStatusComponentChanged = "status.component_changed"
+	EventStatusIncidentCreated  = "status.incident_created"
+	EventStatusIncidentUpdated  = "status.incident_updated"
+	EventStatusIncidentResolved = "status.incident_resolved"
+	EventStatusMaintenanceStart = "status.maintenance_started"
+	EventStatusMaintenanceEnd   = "status.maintenance_ended"
+	EventStatusGlobalChanged    = "status.global_changed"
 )
 
 // SSEBroker manages Server-Sent Event connections and broadcasts events.

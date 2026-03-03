@@ -1,3 +1,14 @@
+// Copyright 2026 Benjamin Touchard (kOlapsis)
+//
+// Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+// or a commercial license. You may not use this file except in compliance
+// with one of these licenses.
+//
+// AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
+// Commercial: See LICENSE-COMMERCIAL.md
+//
+// Source: https://github.com/kolapsis/maintenant
+
 package v1
 
 import (
@@ -31,11 +42,11 @@ func (m *mockLogStreamer) StreamLogs(_ context.Context, _ string, _ int, _ bool)
 
 func TestHandleLogStream(t *testing.T) {
 	tests := []struct {
-		name        string
-		url         string
-		streamer    LogStreamer
-		wantStatus  int
-		wantSSE     bool
+		name         string
+		url          string
+		streamer     LogStreamer
+		wantStatus   int
+		wantSSE      bool
 		wantContains string
 	}{
 		{
@@ -47,8 +58,8 @@ func TestHandleLogStream(t *testing.T) {
 					"2026-02-25T10:00:01Z listening on :8080",
 				},
 			},
-			wantStatus:  http.StatusOK,
-			wantSSE:     true,
+			wantStatus:   http.StatusOK,
+			wantSSE:      true,
 			wantContains: "container.log_line",
 		},
 		{
@@ -75,8 +86,8 @@ func TestHandleLogStream(t *testing.T) {
 			streamer: &mockLogStreamer{
 				lines: []string{"log line 1"},
 			},
-			wantStatus:  http.StatusOK,
-			wantSSE:     true,
+			wantStatus:   http.StatusOK,
+			wantSSE:      true,
 			wantContains: "container.log_line",
 		},
 		{
@@ -85,8 +96,8 @@ func TestHandleLogStream(t *testing.T) {
 			streamer: &mockLogStreamer{
 				lines: []string{},
 			},
-			wantStatus:  http.StatusOK,
-			wantSSE:     true,
+			wantStatus:   http.StatusOK,
+			wantSSE:      true,
 			wantContains: "container.log_error",
 		},
 	}
