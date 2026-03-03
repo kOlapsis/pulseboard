@@ -111,6 +111,9 @@ func main() {
 	channelStore := sqlite.NewChannelStore(db)
 	silenceStore := sqlite.NewSilenceStore(db)
 	statusCompStore := sqlite.NewStatusComponentStore(db)
+	incidentStore := sqlite.NewIncidentStore(db)
+	maintenanceStore := sqlite.NewMaintenanceStore(db)
+	subscriberStore := sqlite.NewSubscriberStore(db)
 	webhookStore := sqlite.NewWebhookStore(db)
 	updateStore := sqlite.NewUpdateStore(db)
 
@@ -363,6 +366,16 @@ func main() {
 	statusSvc.SetBroadcaster(func(eventType string, data interface{}) {
 		statusBroker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
 	})
+	statusSvc.SetIncidentStore(incidentStore)
+	statusSvc.SetMaintenanceStore(maintenanceStore)
+
+	// Subscriber service for email notifications
+	baseURL := envOrDefault("MAINTENANT_BASE_URL", "http://"+addr)
+	subscriberSvc := status.NewSubscriberService(subscriberStore, nil, baseURL, logger)
+	statusSvc.SetSubscriberService(subscriberSvc)
+
+	// Maintenance scheduler
+	maintScheduler := status.NewMaintenanceScheduler(maintenanceStore, statusCompStore, incidentStore, statusSvc, logger)
 
 	statusHandler := status.NewHandler(statusSvc, statusBroker, logger)
 
@@ -374,9 +387,12 @@ func main() {
 	}, v1.APIConfig{
 		WebhookStore: webhookStore,
 	}, v1.StatusAdminOpts{
-		Components: statusCompStore,
-		StatusSvc:  statusSvc,
-		Broker:     statusBroker,
+		Components:  statusCompStore,
+		Incidents:   incidentStore,
+		Subscribers: subscriberStore,
+		Maintenance: maintenanceStore,
+		StatusSvc:   statusSvc,
+		Broker:      statusBroker,
 	})
 
 	// --- License status endpoint ---
@@ -413,9 +429,10 @@ func main() {
 	// --- Wire alert event forwarding from all monitoring services ---
 	alertCh := alertEngine.EventChannel()
 
-	// sendAlert forwards an alert event to the alert engine.
+	// sendAlert forwards an alert event to the alert engine and status page auto-incidents.
 	sendAlert := func(evt alert.Event) {
 		alertCh <- evt
+		statusSvc.HandleAlertEvent(ctx, evt)
 	}
 
 	// Container restart and health alerts
@@ -832,6 +849,12 @@ func main() {
 
 	// --- Certificate scheduler ---
 	certSvc.StartScheduler(ctx)
+
+	// --- Maintenance scheduler ---
+	maintScheduler.Start(ctx)
+
+	// --- Subscriber cleanup ---
+	subscriberSvc.StartCleanupTicker(ctx)
 
 	// --- Background: Retention cleanup ---
 	sqlite.StartRetentionCleanupWithOpts(ctx, store, db, logger, sqlite.RetentionOpts{

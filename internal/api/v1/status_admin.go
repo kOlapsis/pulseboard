@@ -15,27 +15,37 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/kolapsis/maintenant/internal/status"
 )
 
 // StatusAdminHandler handles admin endpoints for the public status page.
 type StatusAdminHandler struct {
-	components status.ComponentStore
-	statusSvc  *status.Service
-	broker     *SSEBroker
+	components  status.ComponentStore
+	incidents   status.IncidentStore
+	subscribers status.SubscriberStore
+	maintenance status.MaintenanceStore
+	statusSvc   *status.Service
+	broker      *SSEBroker
 }
 
 // NewStatusAdminHandler creates a new status admin handler.
 func NewStatusAdminHandler(
 	components status.ComponentStore,
+	incidents status.IncidentStore,
+	subscribers status.SubscriberStore,
+	maintenance status.MaintenanceStore,
 	statusSvc *status.Service,
 	broker *SSEBroker,
 ) *StatusAdminHandler {
 	return &StatusAdminHandler{
-		components: components,
-		statusSvc:  statusSvc,
-		broker:     broker,
+		components:  components,
+		incidents:   incidents,
+		subscribers: subscribers,
+		maintenance: maintenance,
+		statusSvc:   statusSvc,
+		broker:      broker,
 	}
 }
 
@@ -115,7 +125,6 @@ func (h *StatusAdminHandler) HandleListComponents(w http.ResponseWriter, r *http
 		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	// Derive effective status for each
 	for i := range components {
 		components[i].DerivedStatus = h.statusSvc.DeriveComponentStatus(r.Context(), &components[i])
 		if components[i].StatusOverride != nil {
@@ -137,7 +146,6 @@ func (h *StatusAdminHandler) HandleCreateComponent(w http.ResponseWriter, r *htt
 		WriteError(w, http.StatusBadRequest, "validation", "monitor_type and display_name are required")
 		return
 	}
-	// Check for duplicate (only when targeting a specific monitor)
 	if c.MonitorID != 0 {
 		existing, _ := h.components.GetComponentByMonitor(r.Context(), c.MonitorType, c.MonitorID)
 		if existing != nil {
@@ -217,4 +225,432 @@ func (h *StatusAdminHandler) HandleDeleteComponent(w http.ResponseWriter, r *htt
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Incidents ---
+
+func (h *StatusAdminHandler) HandleListIncidents(w http.ResponseWriter, r *http.Request) {
+	opts := status.ListIncidentsOpts{
+		Status:   r.URL.Query().Get("status"),
+		Severity: r.URL.Query().Get("severity"),
+	}
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil {
+		opts.Limit = l
+	}
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil {
+		opts.Offset = o
+	}
+	incidents, total, err := h.incidents.ListIncidents(r.Context(), opts)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"incidents": incidents,
+		"total":     total,
+	})
+}
+
+func (h *StatusAdminHandler) HandleCreateIncident(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title        string  `json:"title"`
+		Severity     string  `json:"severity"`
+		Status       string  `json:"status"`
+		ComponentIDs []int64 `json:"component_ids"`
+		Message      string  `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if req.Title == "" || req.Severity == "" {
+		WriteError(w, http.StatusBadRequest, "validation", "title and severity are required")
+		return
+	}
+	if req.Status == "" {
+		req.Status = status.IncidentInvestigating
+	}
+	inc := &status.Incident{
+		Title:    req.Title,
+		Severity: req.Severity,
+		Status:   req.Status,
+	}
+	id, err := h.incidents.CreateIncident(r.Context(), inc, req.ComponentIDs, req.Message)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	created, _ := h.incidents.GetIncident(r.Context(), id)
+	if created != nil {
+		inc = created
+	}
+
+	compNames := make([]string, 0, len(inc.Components))
+	for _, c := range inc.Components {
+		compNames = append(compNames, c.Name)
+	}
+	h.broker.Broadcast(SSEEvent{Type: EventStatusIncidentCreated, Data: map[string]interface{}{
+		"id":         inc.ID,
+		"title":      inc.Title,
+		"severity":   inc.Severity,
+		"status":     inc.Status,
+		"components": compNames,
+	}})
+
+	WriteJSON(w, http.StatusCreated, inc)
+}
+
+func (h *StatusAdminHandler) HandlePostUpdate(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid incident ID")
+		return
+	}
+	inc, err := h.incidents.GetIncident(r.Context(), id)
+	if err != nil || inc == nil {
+		WriteError(w, http.StatusNotFound, "not_found", "Incident not found")
+		return
+	}
+	var req struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if req.Status == "" || req.Message == "" {
+		WriteError(w, http.StatusBadRequest, "validation", "status and message are required")
+		return
+	}
+	upd := &status.IncidentUpdate{
+		IncidentID: id,
+		Status:     req.Status,
+		Message:    req.Message,
+	}
+	updateID, err := h.incidents.CreateUpdate(r.Context(), upd)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	upd.ID = updateID
+
+	if req.Status == status.IncidentResolved {
+		h.broker.Broadcast(SSEEvent{Type: EventStatusIncidentResolved, Data: map[string]interface{}{
+			"id":    id,
+			"title": inc.Title,
+		}})
+	} else {
+		h.broker.Broadcast(SSEEvent{Type: EventStatusIncidentUpdated, Data: map[string]interface{}{
+			"id":      id,
+			"status":  req.Status,
+			"message": req.Message,
+		}})
+	}
+
+	WriteJSON(w, http.StatusCreated, upd)
+}
+
+func (h *StatusAdminHandler) HandleUpdateIncident(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid incident ID")
+		return
+	}
+	inc, err := h.incidents.GetIncident(r.Context(), id)
+	if err != nil || inc == nil {
+		WriteError(w, http.StatusNotFound, "not_found", "Incident not found")
+		return
+	}
+	var req struct {
+		Title        *string `json:"title"`
+		Severity     *string `json:"severity"`
+		ComponentIDs []int64 `json:"component_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if req.Title != nil {
+		inc.Title = *req.Title
+	}
+	if req.Severity != nil {
+		inc.Severity = *req.Severity
+	}
+	if err := h.incidents.UpdateIncident(r.Context(), inc, req.ComponentIDs); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	updated, _ := h.incidents.GetIncident(r.Context(), id)
+	if updated != nil {
+		inc = updated
+	}
+	WriteJSON(w, http.StatusOK, inc)
+}
+
+func (h *StatusAdminHandler) HandleDeleteIncident(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid incident ID")
+		return
+	}
+	if err := h.incidents.DeleteIncident(r.Context(), id); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Maintenance Windows ---
+
+func (h *StatusAdminHandler) HandleListMaintenance(w http.ResponseWriter, r *http.Request) {
+	statusFilter := r.URL.Query().Get("status")
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil {
+		limit = l
+	}
+	windows, err := h.maintenance.ListMaintenance(r.Context(), statusFilter, limit)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	WriteJSON(w, http.StatusOK, windows)
+}
+
+func (h *StatusAdminHandler) HandleCreateMaintenance(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title        string  `json:"title"`
+		Description  string  `json:"description"`
+		StartsAt     string  `json:"starts_at"`
+		EndsAt       string  `json:"ends_at"`
+		ComponentIDs []int64 `json:"component_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if req.Title == "" {
+		WriteError(w, http.StatusBadRequest, "validation", "title is required")
+		return
+	}
+	startsAt, err := time.Parse(time.RFC3339, req.StartsAt)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "validation", "Invalid starts_at format")
+		return
+	}
+	endsAt, err := time.Parse(time.RFC3339, req.EndsAt)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "validation", "Invalid ends_at format")
+		return
+	}
+	if endsAt.Before(startsAt) {
+		WriteError(w, http.StatusBadRequest, "validation", "ends_at must be after starts_at")
+		return
+	}
+	mw := &status.MaintenanceWindow{
+		Title:       req.Title,
+		Description: req.Description,
+		StartsAt:    startsAt,
+		EndsAt:      endsAt,
+	}
+	id, err := h.maintenance.CreateMaintenance(r.Context(), mw, req.ComponentIDs)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	created, _ := h.maintenance.GetMaintenance(r.Context(), id)
+	if created != nil {
+		mw = created
+	}
+	WriteJSON(w, http.StatusCreated, mw)
+}
+
+func (h *StatusAdminHandler) HandleUpdateMaintenance(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid maintenance ID")
+		return
+	}
+	existing, err := h.maintenance.GetMaintenance(r.Context(), id)
+	if err != nil || existing == nil {
+		WriteError(w, http.StatusNotFound, "not_found", "Maintenance window not found")
+		return
+	}
+	if existing.Active {
+		WriteError(w, http.StatusConflict, "conflict", "Cannot modify an active maintenance window")
+		return
+	}
+	var req struct {
+		Title        *string `json:"title"`
+		Description  *string `json:"description"`
+		StartsAt     *string `json:"starts_at"`
+		EndsAt       *string `json:"ends_at"`
+		ComponentIDs []int64 `json:"component_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if req.Title != nil {
+		existing.Title = *req.Title
+	}
+	if req.Description != nil {
+		existing.Description = *req.Description
+	}
+	if req.StartsAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.StartsAt)
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "validation", "Invalid starts_at format")
+			return
+		}
+		existing.StartsAt = t
+	}
+	if req.EndsAt != nil {
+		t, err := time.Parse(time.RFC3339, *req.EndsAt)
+		if err != nil {
+			WriteError(w, http.StatusBadRequest, "validation", "Invalid ends_at format")
+			return
+		}
+		existing.EndsAt = t
+	}
+	if err := h.maintenance.UpdateMaintenance(r.Context(), existing, req.ComponentIDs); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	updated, _ := h.maintenance.GetMaintenance(r.Context(), id)
+	if updated != nil {
+		existing = updated
+	}
+	WriteJSON(w, http.StatusOK, existing)
+}
+
+func (h *StatusAdminHandler) HandleDeleteMaintenance(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid maintenance ID")
+		return
+	}
+	if err := h.maintenance.DeleteMaintenance(r.Context(), id); err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Subscribers ---
+
+func (h *StatusAdminHandler) HandleListSubscribers(w http.ResponseWriter, r *http.Request) {
+	subs, err := h.subscribers.ListSubscribers(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	stats, err := h.subscribers.GetSubscriberStats(r.Context())
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+
+	type maskedSub struct {
+		ID        int64     `json:"id"`
+		Email     string    `json:"email"`
+		Confirmed bool      `json:"confirmed"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+	masked := make([]maskedSub, 0, len(subs))
+	for _, s := range subs {
+		masked = append(masked, maskedSub{
+			ID:        s.ID,
+			Email:     maskEmail(s.Email),
+			Confirmed: s.Confirmed,
+			CreatedAt: s.CreatedAt,
+		})
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"subscribers": masked,
+		"total":       stats.Total,
+		"confirmed":   stats.Confirmed,
+	})
+}
+
+// --- SMTP Config ---
+
+func (h *StatusAdminHandler) HandleGetSmtpConfig(w http.ResponseWriter, r *http.Request) {
+	cfg := h.statusSvc.GetSmtpConfig()
+	if cfg == nil {
+		WriteJSON(w, http.StatusOK, struct {
+			Host        string `json:"host"`
+			Port        int    `json:"port"`
+			Username    string `json:"username"`
+			TLSPolicy   string `json:"tls_policy"`
+			FromAddress string `json:"from_address"`
+			FromName    string `json:"from_name"`
+			Configured  bool   `json:"configured"`
+			PasswordSet bool   `json:"password_set"`
+		}{})
+		return
+	}
+	resp := struct {
+		Host        string `json:"host"`
+		Port        int    `json:"port"`
+		Username    string `json:"username"`
+		TLSPolicy   string `json:"tls_policy"`
+		FromAddress string `json:"from_address"`
+		FromName    string `json:"from_name"`
+		Configured  bool   `json:"configured"`
+		PasswordSet bool   `json:"password_set"`
+	}{
+		Host:        cfg.Host,
+		Port:        cfg.Port,
+		Username:    cfg.Username,
+		TLSPolicy:   cfg.TLSPolicy,
+		FromAddress: cfg.FromAddress,
+		FromName:    cfg.FromName,
+		Configured:  cfg.Configured,
+		PasswordSet: cfg.Password != "",
+	}
+	WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *StatusAdminHandler) HandleUpdateSmtpConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg status.SmtpConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_body", "Invalid JSON")
+		return
+	}
+	if cfg.Password == "" {
+		if old := h.statusSvc.GetSmtpConfig(); old != nil {
+			cfg.Password = old.Password
+		}
+	}
+	cfg.Configured = cfg.Host != "" && cfg.Port > 0 && cfg.FromAddress != ""
+	h.statusSvc.SetSmtpConfig(&cfg)
+	WriteJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (h *StatusAdminHandler) HandleTestSmtp(w http.ResponseWriter, r *http.Request) {
+	cfg := h.statusSvc.GetSmtpConfig()
+	if cfg == nil || !cfg.Configured {
+		WriteError(w, http.StatusBadRequest, "not_configured", "SMTP is not configured")
+		return
+	}
+	client := status.NewSmtpClient(*cfg)
+	if err := client.Send(cfg.FromAddress, "Maintenant SMTP Test", "<p>This is a test email from Maintenant.</p>"); err != nil {
+		WriteJSON(w, http.StatusOK, map[string]interface{}{"status": "error", "error": err.Error()})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+func maskEmail(email string) string {
+	for i, ch := range email {
+		if ch == '@' {
+			if i <= 1 {
+				return email
+			}
+			return string(email[0]) + "***" + email[i:]
+		}
+	}
+	return email
 }

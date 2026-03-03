@@ -24,6 +24,16 @@ const (
 	UpdateTypeUnknown    UpdateType = "unknown"
 )
 
+// RiskLevel classifies the risk level based on score.
+type RiskLevel string
+
+const (
+	RiskLevelCritical RiskLevel = "critical"
+	RiskLevelHigh     RiskLevel = "high"
+	RiskLevelModerate RiskLevel = "moderate"
+	RiskLevelLow      RiskLevel = "low"
+)
+
 // UpdateStatus represents the lifecycle status of a detected update.
 type UpdateStatus string
 
@@ -73,11 +83,16 @@ type ImageUpdate struct {
 	Registry      string       `json:"registry"`
 	LatestTag     string       `json:"latest_tag,omitempty"`
 	LatestDigest  string       `json:"latest_digest,omitempty"`
-	UpdateType    UpdateType   `json:"update_type,omitempty"`
-	RiskScore     int          `json:"risk_score"`
-	PublishedAt   *time.Time   `json:"published_at,omitempty"`
-	Status        UpdateStatus `json:"status"`
-	DetectedAt    time.Time    `json:"detected_at"`
+	UpdateType         UpdateType   `json:"update_type,omitempty"`
+	PublishedAt        *time.Time   `json:"published_at,omitempty"`
+	ChangelogURL       string       `json:"changelog_url,omitempty"`
+	ChangelogSummary   string       `json:"changelog_summary,omitempty"`
+	HasBreakingChanges bool         `json:"has_breaking_changes"`
+	RiskScore          int          `json:"risk_score"`
+	PreviousDigest     string       `json:"previous_digest,omitempty"`
+	SourceURL          string       `json:"source_url,omitempty"`
+	Status             UpdateStatus `json:"status"`
+	DetectedAt         time.Time    `json:"detected_at"`
 }
 
 // BaseRiskScore returns a risk score based on semver update type.
@@ -126,8 +141,13 @@ type UpdateResult struct {
 	Registry      string
 	LatestTag     string
 	LatestDigest  string
-	UpdateType    UpdateType
-	HasUpdate     bool
+	UpdateType         UpdateType
+	HasUpdate          bool
+	ChangelogURL       string
+	ChangelogSummary   string
+	HasBreakingChanges bool
+	SourceURL          string
+	PreviousDigest     string
 }
 
 // ScanError represents an error scanning a specific container.
@@ -182,6 +202,63 @@ type ContainerCVE struct {
 type ListCVEsOpts struct {
 	Severity    string
 	ContainerID string
+}
+
+// RiskScoreRecord stores historical risk scores for trend tracking.
+type RiskScoreRecord struct {
+	ID          int64     `json:"id"`
+	ContainerID string    `json:"container_id"`
+	Score       int       `json:"score"`
+	FactorsJSON string    `json:"factors_json"`
+	RecordedAt  time.Time `json:"recorded_at"`
+}
+
+// RiskFactor represents one factor contributing to the risk score.
+type RiskFactor struct {
+	Label string `json:"label"`
+	Score int    `json:"score"`
+}
+
+// RiskScore is the computed risk assessment for a container.
+type RiskScore struct {
+	ContainerID string                `json:"container_id"`
+	Score       int                   `json:"score"`
+	Level       RiskLevel             `json:"level"`
+	Factors     map[string]RiskFactor `json:"factors"`
+}
+
+// ReleaseInfo holds information about a GitHub release.
+type ReleaseInfo struct {
+	TagName            string    `json:"tag_name"`
+	Name               string    `json:"name"`
+	Body               string    `json:"body"`
+	PublishedAt        time.Time `json:"published_at"`
+	HTMLURL            string    `json:"html_url"`
+	HasBreakingChanges bool      `json:"has_breaking_changes"`
+}
+
+// DigestReport is a structured summary of all updates for digest generation.
+type DigestReport struct {
+	Critical    []ImageUpdate `json:"critical"`
+	Recommended []ImageUpdate `json:"recommended"`
+	Available   []ImageUpdate `json:"available"`
+	UpToDate    int           `json:"up_to_date"`
+	Untracked   int           `json:"untracked"`
+	TotalCVEs   int           `json:"total_cves"`
+}
+
+// RiskLevelFromScore converts a numeric score to a risk level.
+func RiskLevelFromScore(score int) RiskLevel {
+	switch {
+	case score >= 81:
+		return RiskLevelCritical
+	case score >= 61:
+		return RiskLevelHigh
+	case score >= 31:
+		return RiskLevelModerate
+	default:
+		return RiskLevelLow
+	}
 }
 
 // UpdateConfig holds parsed maintenant.update.* label values.

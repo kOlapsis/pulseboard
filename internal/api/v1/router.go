@@ -82,9 +82,12 @@ type AlertOpts struct {
 
 // StatusAdminOpts holds the status page admin dependencies for the router.
 type StatusAdminOpts struct {
-	Components status.ComponentStore
-	StatusSvc  *status.Service
-	Broker     *SSEBroker
+	Components  status.ComponentStore
+	Incidents   status.IncidentStore
+	Subscribers status.SubscriberStore
+	Maintenance status.MaintenanceStore
+	StatusSvc   *status.Service
+	Broker      *SSEBroker
 }
 
 // APIConfig holds the webhook dependencies for the router.
@@ -252,7 +255,7 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	// Status page admin endpoints
 	if len(statusOpts) > 0 {
 		so := statusOpts[0]
-		sh := NewStatusAdminHandler(so.Components, so.StatusSvc, so.Broker)
+		sh := NewStatusAdminHandler(so.Components, so.Incidents, so.Subscribers, so.Maintenance, so.StatusSvc, so.Broker)
 		// Component groups
 		r.mux.HandleFunc("GET /api/v1/status/groups", sh.HandleListGroups)
 		r.mux.HandleFunc("POST /api/v1/status/groups", sh.HandleCreateGroup)
@@ -263,6 +266,29 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		r.mux.HandleFunc("POST /api/v1/status/components", sh.HandleCreateComponent)
 		r.mux.HandleFunc("PUT /api/v1/status/components/{id}", sh.HandleUpdateComponent)
 		r.mux.HandleFunc("DELETE /api/v1/status/components/{id}", sh.HandleDeleteComponent)
+		// Incidents
+		if so.Incidents != nil {
+			r.mux.HandleFunc("GET /api/v1/status/incidents", sh.HandleListIncidents)
+			r.mux.HandleFunc("POST /api/v1/status/incidents", sh.HandleCreateIncident)
+			r.mux.HandleFunc("PUT /api/v1/status/incidents/{id}", sh.HandleUpdateIncident)
+			r.mux.HandleFunc("DELETE /api/v1/status/incidents/{id}", sh.HandleDeleteIncident)
+			r.mux.HandleFunc("POST /api/v1/status/incidents/{id}/updates", sh.HandlePostUpdate)
+		}
+		// Maintenance windows
+		if so.Maintenance != nil {
+			r.mux.HandleFunc("GET /api/v1/status/maintenance", sh.HandleListMaintenance)
+			r.mux.HandleFunc("POST /api/v1/status/maintenance", sh.HandleCreateMaintenance)
+			r.mux.HandleFunc("PUT /api/v1/status/maintenance/{id}", sh.HandleUpdateMaintenance)
+			r.mux.HandleFunc("DELETE /api/v1/status/maintenance/{id}", sh.HandleDeleteMaintenance)
+		}
+		// Subscribers
+		if so.Subscribers != nil {
+			r.mux.HandleFunc("GET /api/v1/status/subscribers", sh.HandleListSubscribers)
+		}
+		// SMTP config
+		r.mux.HandleFunc("GET /api/v1/status/smtp", sh.HandleGetSmtpConfig)
+		r.mux.HandleFunc("PUT /api/v1/status/smtp", sh.HandleUpdateSmtpConfig)
+		r.mux.HandleFunc("POST /api/v1/status/smtp/test", sh.HandleTestSmtp)
 	}
 
 	// Runtime status endpoint
@@ -377,6 +403,12 @@ func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore upd
 	r.mux.HandleFunc("GET /api/v1/cve", ch.HandleListCVEs)
 	r.mux.HandleFunc("GET /api/v1/cve/{container_id}", ch.HandleGetContainerCVEs)
 
+	// Risk scoring routes
+	rh := NewRiskHandler(updateStore)
+	r.mux.HandleFunc("GET /api/v1/risk", rh.HandleListRiskScores)
+	r.mux.HandleFunc("GET /api/v1/risk/{container_id}", rh.HandleGetContainerRisk)
+	r.mux.HandleFunc("GET /api/v1/risk/{container_id}/history", rh.HandleGetRiskHistory)
+
 	// Wire SSE broadcasting
 	updateSvc.SetEventCallback(func(eventType string, data interface{}) {
 		r.broker.Broadcast(SSEEvent{Type: eventType, Data: data})
@@ -453,16 +485,16 @@ func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 			"edition":           string(extension.CurrentEdition()),
 			"organisation_name": organisationName,
 			"features": map[string]bool{
-				"cve_enrichment":      isEnterprise,
-				"risk_scoring":        isEnterprise,
-				"changelog":           isEnterprise,
-				"incidents":           isEnterprise,
-				"maintenance_windows": isEnterprise,
-				"subscribers":         isEnterprise,
+				"cve_enrichment":      true,
+				"risk_scoring":        true,
+				"changelog":           true,
+				"incidents":           true,
+				"maintenance_windows": true,
+				"subscribers":         true,
 				"smtp":                smtpConfigured,
 				"slack":               isEnterprise,
 				"teams":               isEnterprise,
-				"resource_history":    isEnterprise,
+				"resource_history":    true,
 				"alert_escalation":    isEnterprise,
 				"alert_routing":       isEnterprise,
 				"alert_templates":     isEnterprise,

@@ -14,6 +14,8 @@ package status
 import (
 	"context"
 	"log/slog"
+
+	"github.com/kolapsis/maintenant/internal/alert"
 )
 
 // MonitorStatusProvider resolves the current health status of a specific monitor.
@@ -21,10 +23,14 @@ type MonitorStatusProvider func(ctx context.Context, monitorType string, monitor
 
 // Service encapsulates public status page business logic.
 type Service struct {
-	components ComponentStore
+	components  ComponentStore
+	incidents   IncidentStore
+	maintenance MaintenanceStore
 
 	monitorStatus MonitorStatusProvider
 	broadcaster   func(eventType string, data interface{})
+	subscribers   *SubscriberService
+	smtpConfig    *SmtpConfig
 
 	logger *slog.Logger
 }
@@ -48,6 +54,38 @@ func (s *Service) SetMonitorStatusProvider(fn MonitorStatusProvider) {
 // SetBroadcaster sets the function used to broadcast SSE events.
 func (s *Service) SetBroadcaster(fn func(eventType string, data interface{})) {
 	s.broadcaster = fn
+}
+
+// SetIncidentStore sets the incident store used by the feed handler.
+func (s *Service) SetIncidentStore(store IncidentStore) {
+	s.incidents = store
+}
+
+// SetSubscriberService sets the subscriber service used for notifications.
+func (s *Service) SetSubscriberService(sub *SubscriberService) {
+	s.subscribers = sub
+}
+
+// SetMaintenanceStore sets the maintenance store used by GetPageData.
+func (s *Service) SetMaintenanceStore(store MaintenanceStore) {
+	s.maintenance = store
+}
+
+// GetSmtpConfig returns the current SMTP configuration.
+func (s *Service) GetSmtpConfig() *SmtpConfig {
+	return s.smtpConfig
+}
+
+// SetSmtpConfig updates the SMTP configuration.
+func (s *Service) SetSmtpConfig(cfg *SmtpConfig) {
+	s.smtpConfig = cfg
+}
+
+// notifySubscribers sends a notification to all confirmed subscribers if configured.
+func (s *Service) notifySubscribers(ctx context.Context, subject, message string) {
+	if s.subscribers != nil {
+		go s.subscribers.NotifyAll(ctx, subject, message)
+	}
 }
 
 // broadcast sends an event if a broadcaster is configured.
@@ -125,10 +163,13 @@ func (s *Service) ComputeGlobalStatus(ctx context.Context) (string, string) {
 
 // PageData holds all data needed to render the public status page.
 type PageData struct {
-	GlobalStatus  string
-	GlobalMessage string
-	Groups        []GroupData
-	Ungrouped     []ComponentData
+	GlobalStatus    string
+	GlobalMessage   string
+	Groups          []GroupData
+	Ungrouped       []ComponentData
+	ActiveIncidents []Incident
+	RecentIncidents []Incident
+	Maintenance     []MaintenanceWindow
 }
 
 // GroupData holds a component group with its components for rendering.
@@ -201,12 +242,39 @@ func (s *Service) GetPageData(ctx context.Context) (*PageData, error) {
 		groups = append(groups, *groupMap[name])
 	}
 
-	return &PageData{
+	pd := &PageData{
 		GlobalStatus:  globalStatus,
 		GlobalMessage: globalMsg,
 		Groups:        groups,
 		Ungrouped:     ungrouped,
-	}, nil
+	}
+
+	if s.incidents != nil {
+		active, err := s.incidents.ListActiveIncidents(ctx)
+		if err != nil {
+			s.logger.Error("failed to list active incidents", "error", err)
+		} else {
+			pd.ActiveIncidents = active
+		}
+
+		recent, err := s.incidents.ListRecentIncidents(ctx, 7)
+		if err != nil {
+			s.logger.Error("failed to list recent incidents", "error", err)
+		} else {
+			pd.RecentIncidents = recent
+		}
+	}
+
+	if s.maintenance != nil {
+		maint, err := s.maintenance.ListMaintenance(ctx, "upcoming", 5)
+		if err != nil {
+			s.logger.Error("failed to list upcoming maintenance", "error", err)
+		} else {
+			pd.Maintenance = maint
+		}
+	}
+
+	return pd, nil
 }
 
 // NotifyMonitorChanged checks whether a status component is linked to the given
@@ -224,6 +292,97 @@ func (s *Service) NotifyMonitorChanged(ctx context.Context, monitorType string, 
 			s.BroadcastComponentChange(ctx, &globals[i])
 		}
 	}
+}
+
+// HandleAlertEvent processes an alert event and creates/updates incidents for auto-incident components.
+func (s *Service) HandleAlertEvent(ctx context.Context, evt alert.Event) {
+	if s.incidents == nil {
+		return
+	}
+
+	monitorType := evt.EntityType
+	monitorID := evt.EntityID
+
+	comp, err := s.components.GetComponentByMonitor(ctx, monitorType, monitorID)
+	if err != nil || comp == nil || !comp.AutoIncident {
+		return
+	}
+
+	existing, err := s.incidents.GetActiveIncidentByComponent(ctx, comp.ID)
+	if err != nil {
+		s.logger.Error("failed to check active incident", "error", err, "component_id", comp.ID)
+		return
+	}
+
+	if evt.IsRecover {
+		if existing != nil {
+			upd := &IncidentUpdate{
+				IncidentID: existing.ID,
+				Status:     IncidentResolved,
+				Message:    "Auto-resolved: " + evt.Message,
+				IsAuto:     true,
+			}
+			if _, err := s.incidents.CreateUpdate(ctx, upd); err != nil {
+				s.logger.Error("failed to auto-resolve incident", "error", err)
+				return
+			}
+			s.broadcast("status.incident_resolved", map[string]interface{}{
+				"id":    existing.ID,
+				"title": existing.Title,
+			})
+			s.notifySubscribers(ctx, "Resolved: "+existing.Title,
+				"<p>Incident <strong>"+existing.Title+"</strong> has been resolved.</p><p>"+evt.Message+"</p>")
+		}
+		return
+	}
+
+	if existing != nil {
+		upd := &IncidentUpdate{
+			IncidentID: existing.ID,
+			Status:     existing.Status,
+			Message:    evt.Message,
+			IsAuto:     true,
+		}
+		if _, err := s.incidents.CreateUpdate(ctx, upd); err != nil {
+			s.logger.Error("failed to add auto update", "error", err)
+		}
+		s.broadcast("status.incident_updated", map[string]interface{}{
+			"id":      existing.ID,
+			"status":  existing.Status,
+			"message": evt.Message,
+		})
+		return
+	}
+
+	severity := SeverityMinor
+	switch evt.Severity {
+	case "critical":
+		severity = SeverityCritical
+	case "warning":
+		severity = SeverityMajor
+	}
+
+	inc := &Incident{
+		Title:    comp.DisplayName + " - " + evt.Message,
+		Severity: severity,
+		Status:   IncidentInvestigating,
+	}
+	incID, err := s.incidents.CreateIncident(ctx, inc, []int64{comp.ID}, evt.Message)
+	if err != nil {
+		s.logger.Error("failed to create auto incident", "error", err)
+		return
+	}
+
+	s.broadcast("status.incident_created", map[string]interface{}{
+		"id":         incID,
+		"title":      inc.Title,
+		"severity":   inc.Severity,
+		"status":     inc.Status,
+		"components": []string{comp.DisplayName},
+	})
+
+	s.notifySubscribers(ctx, "["+inc.Severity+"] "+inc.Title,
+		"<p><strong>"+inc.Title+"</strong></p><p>Severity: "+inc.Severity+"</p><p>"+evt.Message+"</p>")
 }
 
 // BroadcastComponentChange notifies public SSE clients of a component status change.

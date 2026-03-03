@@ -56,6 +56,10 @@ type UpdateStore interface {
 	DeleteContainerCVEs(ctx context.Context, containerID string) error
 	GetCVESummaryCounts(ctx context.Context) (map[string]int, error)
 
+	// Risk score history
+	InsertRiskScoreRecord(ctx context.Context, r *RiskScoreRecord) (int64, error)
+	ListRiskScoreHistory(ctx context.Context, containerID string, from, to time.Time) ([]*RiskScoreRecord, error)
+
 	// Retention cleanup
 	CleanupExpired(ctx context.Context, olderThan time.Time) (int64, error)
 }
@@ -64,6 +68,7 @@ type UpdateStore interface {
 type ListImageUpdatesOpts struct {
 	Status     string
 	UpdateType string
+	MinRisk    int
 }
 
 // UpdateSummary holds aggregated update counts.
