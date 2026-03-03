@@ -43,15 +43,13 @@ const router = createRouter({
         { path: 'status-admin', name: 'status-admin', component: StatusAdminPage },
         { path: 'webhooks', name: 'webhooks', component: WebhooksPage },
         { path: 'updates', name: 'updates', component: UpdatesPage },
-        { path: 'pro', name: 'pro', component: ProPage },
+        { path: 'pro-edition', name: 'pro-edition', component: ProPage },
       ],
     },
     {
       path: '/status',
       component: PublicLayout,
-      children: [
-        { path: '', name: 'status-public', component: PublicStatusPage },
-      ],
+      children: [{ path: '', name: 'status-public', component: PublicStatusPage }],
     },
   ],
 })

@@ -67,7 +67,7 @@ func main() {
 	}))
 	logger.Info("maintenant starting", "version", version, "commit", commit, "build_date", buildDate)
 	v1.SetBuildVersion(version)
-	v1.SetOrganisationName(os.Getenv("MAINTENANT_ORGANISATION_NAME"))
+	v1.SetOrganisationName(envOrDefault("MAINTENANT_ORGANISATION_NAME", "Maintenant"))
 
 	// Configuration from environment
 	addr := envOrDefault("MAINTENANT_ADDR", "127.0.0.1:8080")
@@ -848,13 +848,13 @@ func main() {
 	go resSvc.Start(ctx)
 
 	// --- Certificate scheduler ---
-	certSvc.StartScheduler(ctx)
+	go certSvc.Start(ctx)
 
 	// --- Maintenance scheduler ---
-	maintScheduler.Start(ctx)
+	go maintScheduler.Start(ctx)
 
 	// --- Subscriber cleanup ---
-	subscriberSvc.StartCleanupTicker(ctx)
+	go subscriberSvc.Start(ctx)
 
 	// --- Background: Retention cleanup ---
 	sqlite.StartRetentionCleanupWithOpts(ctx, store, db, logger, sqlite.RetentionOpts{

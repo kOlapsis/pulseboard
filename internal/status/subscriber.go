@@ -140,23 +140,21 @@ func (s *SubscriberService) CleanExpired(ctx context.Context) (int64, error) {
 	return s.store.CleanExpiredUnconfirmed(ctx)
 }
 
-// StartCleanupTicker runs periodic cleanup of expired unconfirmed subscribers.
-func (s *SubscriberService) StartCleanupTicker(ctx context.Context) {
+// Start runs periodic cleanup of expired unconfirmed subscribers.
+func (s *SubscriberService) Start(ctx context.Context) {
 	ticker := time.NewTicker(24 * time.Hour)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				deleted, err := s.CleanExpired(ctx)
-				if err != nil {
-					s.logger.Error("subscriber cleanup failed", "error", err)
-				} else if deleted > 0 {
-					s.logger.Info("cleaned expired subscribers", "deleted", deleted)
-				}
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			deleted, err := s.CleanExpired(ctx)
+			if err != nil {
+				s.logger.Error("subscriber cleanup failed", "error", err)
+			} else if deleted > 0 {
+				s.logger.Info("cleaned expired subscribers", "deleted", deleted)
 			}
 		}
-	}()
+	}
 }

@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	licenseServerURL = "https://license.maintenant.dev"
+	// licenseServerURL = "https://license.maintenant.dev"
+	licenseServerURL = "http://maintenant-admin:8090"
 )
 
 // licenseServerOverride can be set via -ldflags to point to a dev/staging server.
@@ -74,7 +75,7 @@ func verify(publicKey ed25519.PublicKey, resp SignedResponse) (*LicensePayload, 
 // fetchLicense calls the license server with the given key and returns the
 // signed response. The caller is responsible for verifying the signature.
 func fetchLicense(ctx context.Context, client *http.Client, serverURL, licenseKey, version string) (*SignedResponse, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, serverURL+"/v1/license/verify", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, serverURL+"/api/v1/license/verify", nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("creating license request: %w", err)
 	}

@@ -38,10 +38,10 @@ type EventCallback func(eventType string, data interface{})
 
 // Service orchestrates certificate monitoring.
 type Service struct {
-	store    CertificateStore
-	logger   *slog.Logger
-	onEvent  EventCallback
-	mu       sync.Mutex
+	store   CertificateStore
+	logger  *slog.Logger
+	onEvent EventCallback
+	mu      sync.Mutex
 }
 
 // NewService creates a new certificate service.
@@ -399,22 +399,20 @@ func (s *Service) ListCheckResults(ctx context.Context, monitorID int64, opts Li
 
 // --- US2: Scheduler ---
 
-// StartScheduler starts a background goroutine that periodically checks
+// Start starts a background goroutine that periodically checks
 // standalone certificate monitors that are due for a check.
-func (s *Service) StartScheduler(ctx context.Context) {
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
+func (s *Service) Start(ctx context.Context) {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.runScheduledChecks(ctx)
-			}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.runScheduledChecks(ctx)
 		}
-	}()
+	}
 }
 
 func (s *Service) runScheduledChecks(ctx context.Context) {

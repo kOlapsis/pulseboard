@@ -1,4 +1,4 @@
-<\!--
+<!--
   Copyright 2026 Benjamin Touchard (kOlapsis)
 
   Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
@@ -12,7 +12,7 @@
 -->
 
 <script setup lang="ts">
-import {ref} from 'vue'
+import { ref } from 'vue'
 import {
   Sparkles,
   Shield,
@@ -32,12 +32,14 @@ const features = [
   {
     icon: AlertTriangle,
     title: 'Incident Management',
-    description: 'Real-time incident tracking with timeline, severity levels, and coordinated communication.',
+    description:
+      'Real-time incident tracking with timeline, severity levels, and coordinated communication.',
   },
   {
     icon: Clock,
     title: 'Maintenance Windows',
-    description: 'Schedule maintenance periods with automatic notifications and status page updates.',
+    description:
+      'Schedule maintenance periods with automatic notifications and status page updates.',
   },
   {
     icon: Bell,
@@ -57,12 +59,14 @@ const features = [
   {
     icon: Shield,
     title: 'Risk Scoring & CVE Enrichment',
-    description: 'Vulnerability intelligence for container updates with severity scoring and CVE details.',
+    description:
+      'Vulnerability intelligence for container updates with severity scoring and CVE details.',
   },
   {
     icon: TrendingUp,
     title: 'Resource History',
-    description: 'Track CPU, memory, and disk trends over 24h, 7d, and 30d to spot resource drift early.',
+    description:
+      'Track CPU, memory, and disk trends over 24h, 7d, and 30d to spot resource drift early.',
   },
 ]
 </script>
@@ -82,8 +86,8 @@ const features = [
           Unlock the full power of maintenant
         </h1>
         <p class="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Everything in Community, plus incident management, advanced notifications,
-          vulnerability intelligence, and extended resource history.
+          Everything in Community, plus incident management, advanced notifications, vulnerability
+          intelligence, and extended resource history.
         </p>
       </div>
 
@@ -115,7 +119,9 @@ const features = [
         <div class="flex items-center justify-center gap-3 mb-8">
           <button
             class="text-sm font-medium transition-colors"
-            :class="billingPeriod === 'monthly' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
+            :class="
+              billingPeriod === 'monthly' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+            "
             @click="billingPeriod = 'monthly'"
           >
             Monthly
@@ -132,7 +138,9 @@ const features = [
           </button>
           <button
             class="text-sm font-medium transition-colors flex items-center gap-1.5"
-            :class="billingPeriod === 'annual' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
+            :class="
+              billingPeriod === 'annual' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+            "
             @click="billingPeriod = 'annual'"
           >
             Annual
@@ -150,9 +158,7 @@ const features = [
           <div
             class="relative bg-[#12151C] border rounded-xl p-6 transition-colors"
             :class="
-              billingPeriod === 'monthly'
-                ? 'border-pb-green-500/40'
-                : 'border-slate-800 opacity-60'
+              billingPeriod === 'monthly' ? 'border-pb-green-500/40' : 'border-slate-800 opacity-60'
             "
           >
             <h3 class="text-sm font-semibold text-slate-300 mb-3">Monthly</h3>
@@ -161,7 +167,7 @@ const features = [
               <span class="text-sm text-slate-500">/month</span>
             </div>
             <a
-              href="#"
+              href="https://buy.stripe.com/test_4gMfZhcZ0fe977N88I2go00"
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'monthly'
@@ -177,9 +183,7 @@ const features = [
           <div
             class="relative bg-[#12151C] border rounded-xl p-6 transition-colors"
             :class="
-              billingPeriod === 'annual'
-                ? 'border-pb-green-500/40'
-                : 'border-slate-800 opacity-60'
+              billingPeriod === 'annual' ? 'border-pb-green-500/40' : 'border-slate-800 opacity-60'
             "
           >
             <span
@@ -195,7 +199,7 @@ const features = [
             </div>
             <p class="text-xs text-emerald-400 mb-3">7.50€/month — save 18€</p>
             <a
-              href="#"
+              href="https://buy.stripe.com/test_bJe14n0ceea51Nt3Ss2go01"
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'annual'
@@ -212,11 +216,7 @@ const features = [
         <div class="mt-8 bg-[#12151C] border border-slate-800 rounded-xl p-6">
           <h3 class="text-sm font-semibold text-white mb-4">Everything in Pro includes:</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div
-              v-for="feature in features"
-              :key="feature.title"
-              class="flex items-center gap-2.5"
-            >
+            <div v-for="feature in features" :key="feature.title" class="flex items-center gap-2.5">
               <Check :size="14" class="text-pb-green-400 shrink-0" />
               <span class="text-sm text-slate-300">{{ feature.title }}</span>
             </div>

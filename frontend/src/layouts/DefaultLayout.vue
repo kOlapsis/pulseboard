@@ -1,22 +1,14 @@
-<\!--
-  Copyright 2026 Benjamin Touchard (kOlapsis)
-
-  Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
-  or a commercial license. You may not use this file except in compliance
-  with one of these licenses.
-
-  AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
-  Commercial: See LICENSE-COMMERCIAL.md
-
-  Source: https://github.com/kolapsis/maintenant
--->
+<!-- Copyright 2026 Benjamin Touchard (kOlapsis) Licensed under the GNU Affero General Public
+License v3.0 (AGPL-3.0) or a commercial license. You may not use this file except in compliance with
+one of these licenses. AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html Commercial: See
+LICENSE-COMMERCIAL.md Source: https://github.com/kolapsis/maintenant -->
 
 <script setup lang="ts">
-import {RouterLink, RouterView, useRoute} from 'vue-router'
-import {ref, onMounted} from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
-import {useAppVersion} from '@/composables/useAppVersion'
-import {useEdition} from '@/composables/useEdition'
+import { useAppVersion } from '@/composables/useAppVersion'
+import { useEdition } from '@/composables/useEdition'
 import {
   Activity,
   AlertTriangle,
@@ -33,8 +25,8 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
-const {version} = useAppVersion()
-const {isEnterprise, licenseMessage, licenseStatusValue, loadLicenseStatus} = useEdition()
+const { version } = useAppVersion()
+const { isEnterprise, licenseMessage, licenseStatusValue, loadLicenseStatus } = useEdition()
 
 onMounted(() => {
   loadLicenseStatus()
@@ -47,15 +39,15 @@ function closeMobileMenu() {
 }
 
 const mainNav = [
-  {to: '/dashboard', label: 'Dashboard', icon: LayoutGrid},
-  {to: '/containers', label: 'Containers', icon: Box},
-  {to: '/endpoints', label: 'HTTP Endpoints', icon: Globe},
-  {to: '/heartbeats', label: 'Heartbeats', icon: Heart},
-  {to: '/certificates', label: 'SSL Certificates', icon: Shield},
-  {to: '/updates', label: 'Updates', icon: ArrowUpCircle},
-  {to: '/alerts', label: 'Alerts', icon: Bell},
-  {to: '/webhooks', label: 'Webhooks', icon: Link},
-  {to: '/status-admin', label: 'Status Pages', icon: Activity},
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/containers', label: 'Containers', icon: Box },
+  { to: '/endpoints', label: 'HTTP Endpoints', icon: Globe },
+  { to: '/heartbeats', label: 'Heartbeats', icon: Heart },
+  { to: '/certificates', label: 'SSL Certificates', icon: Shield },
+  { to: '/updates', label: 'Updates', icon: ArrowUpCircle },
+  { to: '/alerts', label: 'Alerts', icon: Bell },
+  { to: '/webhooks', label: 'Webhooks', icon: Link },
+  { to: '/status-admin', label: 'Status Pages', icon: Activity },
 ]
 </script>
 
@@ -68,7 +60,7 @@ const mainNav = [
       <div class="flex flex-col flex-1 overflow-y-auto">
         <!-- Logo -->
         <div class="p-6 flex items-center gap-3 shrink-0">
-          <img src="/logo.svg" alt="maintenant"/>
+          <img src="/logo.svg" alt="maintenant" />
         </div>
 
         <!-- Main nav -->
@@ -103,23 +95,29 @@ const mainNav = [
         <!-- Bottom section: Edition -->
         <div class="p-4 border-t border-slate-800 space-y-3 shrink-0">
           <div class="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40">
-            <div class="flex justify-between items-center mb-2.5">
-              <span class="text-[10px] font-bold uppercase tracking-tighter"
+            <div class="flex justify-between items-center" :class="{ 'mb-2.5': !isEnterprise }">
+              <span
+                class="text-[10px] font-bold uppercase tracking-tighter"
                 :class="isEnterprise ? 'text-emerald-400' : 'text-slate-400'"
-              >{{ isEnterprise ? 'Pro Edition' : 'Community Edition' }}</span>
+                >{{ isEnterprise ? 'Pro Edition' : 'Community Edition' }}</span
+              >
               <span
                 class="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                :class="isEnterprise
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-pb-green-500/20 text-pb-green-400 border border-pb-green-500/30'"
-              >{{ version }}</span>
+                :class="
+                  isEnterprise
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-pb-green-500/20 text-pb-green-400 border border-pb-green-500/30'
+                "
+                >{{ version }}</span
+              >
             </div>
-            <span
+            <router-link
               v-if="!isEnterprise"
-              class="block w-full py-1.5 bg-slate-700/50 text-slate-500 rounded-lg text-xs font-semibold text-center cursor-default"
+              :to="{ name: 'pro-edition' }"
+              class="block w-full py-1.5 bg-slate-700/50 text-slate-300 hover:text-slate-200 rounded-lg text-xs font-semibold text-center transition-colors"
             >
-              Pro coming soon
-            </span>
+              Pro Edition
+            </router-link>
           </div>
         </div>
       </div>
@@ -134,14 +132,14 @@ const mainNav = [
         class="p-1.5 rounded-md text-slate-400 hover:text-white transition-colors"
         aria-label="Toggle navigation"
       >
-        <Menu v-if="!mobileMenuOpen" :size="20"/>
-        <X v-else :size="20"/>
+        <Menu v-if="!mobileMenuOpen" :size="20" />
+        <X v-else :size="20" />
       </button>
       <div class="ml-3 flex items-center gap-2">
-        <img src="/logo.svg" alt="maintenant" class="w-6 h-6 rounded-md"/>
+        <img src="/logo.svg" alt="maintenant" class="w-6 h-6 rounded-md" />
         <span class="text-sm font-bold text-white">maintenant</span>
       </div>
-      <div class="flex-1"/>
+      <div class="flex-1" />
     </div>
 
     <!-- Mobile overlay -->
@@ -160,7 +158,7 @@ const mainNav = [
         class="md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#12151C] border-r border-slate-800 flex flex-col"
       >
         <div class="p-6 flex items-center gap-3">
-          <img src="/logo.svg" alt="maintenant" class="w-8 h-8 rounded-lg"/>
+          <img src="/logo.svg" alt="maintenant" class="w-8 h-8 rounded-lg" />
           <h1 class="text-xl font-bold tracking-tight text-white">maintenant</h1>
         </div>
         <nav class="flex-1 px-4 space-y-0.5 overflow-y-auto pb-4">
@@ -177,7 +175,7 @@ const mainNav = [
             @click="closeMobileMenu"
           >
             <div class="flex items-center gap-3">
-              <component :is="item.icon" :size="16" class="shrink-0"/>
+              <component :is="item.icon" :size="16" class="shrink-0" />
               <span class="text-sm font-medium">{{ item.label }}</span>
             </div>
           </RouterLink>
@@ -192,18 +190,22 @@ const mainNav = [
         v-if="licenseMessage"
         class="flex items-center gap-2 px-4 py-2 text-xs font-medium shrink-0"
         :class="{
-          'bg-amber-500/10 text-amber-400 border-b border-amber-500/20': licenseStatusValue === 'grace' || licenseStatusValue === 'unreachable',
-          'bg-red-500/10 text-red-400 border-b border-red-500/20': licenseStatusValue === 'expired' || licenseStatusValue === 'revoked' || licenseStatusValue === 'unknown',
+          'bg-amber-500/10 text-amber-400 border-b border-amber-500/20':
+            licenseStatusValue === 'grace' || licenseStatusValue === 'unreachable',
+          'bg-red-500/10 text-red-400 border-b border-red-500/20':
+            licenseStatusValue === 'expired' ||
+            licenseStatusValue === 'revoked' ||
+            licenseStatusValue === 'unknown',
         }"
       >
         <AlertTriangle :size="14" class="shrink-0" />
         <span>{{ licenseMessage }}</span>
       </div>
-      <AppHeader/>
+      <AppHeader />
       <div class="flex-1 overflow-y-auto pt-14 md:pt-0">
         <RouterView v-slot="{ Component }">
           <Suspense>
-            <component :is="Component"/>
+            <component :is="Component" />
           </Suspense>
         </RouterView>
       </div>
