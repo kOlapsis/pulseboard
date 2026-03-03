@@ -217,6 +217,8 @@ func (s *Service) ProcessPing(ctx context.Context, uuid string, sourceIP, httpMe
 		return nil, ErrHeartbeatNotFound
 	}
 
+	s.logger.Debug("heartbeat: ping received", "uuid", uuid, "heartbeat_id", h.ID, "source_ip", sourceIP)
+
 	now := time.Now()
 	previousStatus := h.Status
 
@@ -247,6 +249,7 @@ func (s *Service) ProcessPing(ctx context.Context, uuid string, sourceIP, httpMe
 		durationMs := now.Sub(*h.CurrentRunStartedAt).Milliseconds()
 		h.LastDurationMs = &durationMs
 		h.CurrentRunStartedAt = nil
+		s.logger.Debug("heartbeat: execution completed", "heartbeat_id", h.ID, "duration_ms", durationMs)
 
 		// Complete current execution
 		exec, err := s.store.GetCurrentExecution(ctx, h.ID)
@@ -325,6 +328,8 @@ func (s *Service) ProcessStartPing(ctx context.Context, uuid string, sourceIP, h
 		return nil, ErrHeartbeatNotFound
 	}
 
+	s.logger.Debug("heartbeat: start ping received", "uuid", uuid, "heartbeat_id", h.ID)
+
 	now := time.Now()
 
 	// Record ping
@@ -342,6 +347,7 @@ func (s *Service) ProcessStartPing(ctx context.Context, uuid string, sourceIP, h
 	// Close any in-progress execution as timeout
 	currentExec, err := s.store.GetCurrentExecution(ctx, h.ID)
 	if err == nil && currentExec != nil {
+		s.logger.Debug("heartbeat: timing out previous execution", "heartbeat_id", h.ID, "execution_id", currentExec.ID)
 		if err := s.store.UpdateExecution(ctx, currentExec.ID, &now, nil, nil, OutcomeTimeout, nil); err != nil {
 			s.logger.Error("timeout previous execution", "execution_id", currentExec.ID, "error", err)
 		}
@@ -402,6 +408,8 @@ func (s *Service) ProcessExitCodePing(ctx context.Context, uuid string, exitCode
 	if h == nil {
 		return nil, ErrHeartbeatNotFound
 	}
+
+	s.logger.Debug("heartbeat: exit code ping received", "uuid", uuid, "heartbeat_id", h.ID, "exit_code", exitCode)
 
 	now := time.Now()
 	previousStatus := h.Status
@@ -535,6 +543,7 @@ func (s *Service) ProcessExitCodePing(ctx context.Context, uuid string, exitCode
 
 func (s *Service) StartDeadlineChecker(ctx context.Context) {
 	go func() {
+		s.logger.Info("heartbeat: deadline checker started")
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
@@ -543,6 +552,7 @@ func (s *Service) StartDeadlineChecker(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				s.logger.Debug("heartbeat: running deadline check")
 				s.checkDeadlines(ctx)
 			}
 		}
@@ -615,6 +625,8 @@ func (s *Service) checkDeadlines(ctx context.Context) {
 			"name", h.Name,
 			"previous_status", string(previousStatus))
 	}
+
+	s.logger.Debug("heartbeat: deadline check completed", "overdue_count", len(overdue))
 }
 
 // --- Pause / Resume ---
@@ -631,6 +643,8 @@ func (s *Service) PauseHeartbeat(ctx context.Context, id int64) (*Heartbeat, err
 	if err := s.store.PauseHeartbeat(ctx, id); err != nil {
 		return nil, err
 	}
+
+	s.logger.Info("heartbeat: paused", "id", id)
 
 	s.emitEvent("heartbeat.status_changed", map[string]interface{}{
 		"heartbeat_id": id,
@@ -658,6 +672,8 @@ func (s *Service) ResumeHeartbeat(ctx context.Context, id int64) (*Heartbeat, er
 	if err := s.store.ResumeHeartbeat(ctx, id, deadline); err != nil {
 		return nil, err
 	}
+
+	s.logger.Info("heartbeat: resumed", "id", id)
 
 	s.emitEvent("heartbeat.status_changed", map[string]interface{}{
 		"heartbeat_id": id,

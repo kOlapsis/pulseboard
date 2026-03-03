@@ -78,11 +78,14 @@ func (e *CheckEngine) RemoveEndpoint(endpointID int64) {
 
 // ReconfigureEndpoint stops and restarts the check goroutine with updated configuration.
 func (e *CheckEngine) ReconfigureEndpoint(ctx context.Context, ep *Endpoint) {
+	e.logger.Debug("endpoint: reconfiguring", "endpoint_id", ep.ID)
 	e.AddEndpoint(ctx, ep)
 }
 
 // Stop cancels all running check goroutines and waits for them to finish.
 func (e *CheckEngine) Stop() {
+	count := e.ActiveCount()
+	e.logger.Info("endpoint: check engine stopping", "count", count)
 	e.runners.Range(func(key, value any) bool {
 		runner := value.(*endpointRunner)
 		runner.cancel()
@@ -121,6 +124,7 @@ func (e *CheckEngine) runLoop(ctx context.Context, ep *Endpoint, wg *sync.WaitGr
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			e.logger.Debug("endpoint: running check", "endpoint_id", ep.ID, "type", ep.EndpointType, "target", ep.Target)
 			e.executeCheck(ctx, ep)
 		}
 	}
@@ -138,6 +142,8 @@ func (e *CheckEngine) executeCheck(ctx context.Context, ep *Endpoint) {
 		e.logger.Warn("unknown endpoint type", "endpoint_id", ep.ID, "type", ep.EndpointType)
 		return
 	}
+
+	e.logger.Debug("endpoint: check result", "endpoint_id", ep.ID, "success", result.Success, "response_time_ms", result.ResponseTimeMs, "status_code", result.HTTPStatus)
 
 	if e.callback != nil {
 		e.callback(ep.ID, result)

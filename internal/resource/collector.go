@@ -112,6 +112,7 @@ func (c *Collector) collect(ctx context.Context) {
 	}
 
 	if len(running) == 0 {
+		c.logger.Debug("resource: no running containers, skipping collection")
 		return
 	}
 
@@ -135,7 +136,8 @@ func (c *Collector) collect(ctx context.Context) {
 				return
 			}
 			if raw == nil {
-				return // first sample, no delta yet
+				c.logger.Debug("resource: first sample, awaiting delta", "container_name", ct.Name)
+				return
 			}
 
 			snap := &ResourceSnapshot{
@@ -176,6 +178,7 @@ func (c *Collector) cleanStale(running []*container.Container) {
 	defer c.mu.Unlock()
 	for id := range c.latest {
 		if _, ok := runningIDs[id]; !ok {
+			c.logger.Debug("resource: removed stale snapshot", "container_id", id)
 			delete(c.latest, id)
 		}
 	}

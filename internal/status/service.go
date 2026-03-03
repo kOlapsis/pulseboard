@@ -297,6 +297,7 @@ func (s *Service) NotifyMonitorChanged(ctx context.Context, monitorType string, 
 // HandleAlertEvent processes an alert event and creates/updates incidents for auto-incident components.
 func (s *Service) HandleAlertEvent(ctx context.Context, evt alert.Event) {
 	if s.incidents == nil {
+		s.logger.Debug("status: no incident store, skipping alert")
 		return
 	}
 
@@ -305,6 +306,7 @@ func (s *Service) HandleAlertEvent(ctx context.Context, evt alert.Event) {
 
 	comp, err := s.components.GetComponentByMonitor(ctx, monitorType, monitorID)
 	if err != nil || comp == nil || !comp.AutoIncident {
+		s.logger.Debug("status: no auto-incident component", "monitor_type", monitorType, "monitor_id", monitorID)
 		return
 	}
 
@@ -326,6 +328,7 @@ func (s *Service) HandleAlertEvent(ctx context.Context, evt alert.Event) {
 				s.logger.Error("failed to auto-resolve incident", "error", err)
 				return
 			}
+			s.logger.Info("status: auto-incident resolved", "incident_id", existing.ID, "title", existing.Title)
 			s.broadcast("status.incident_resolved", map[string]interface{}{
 				"id":    existing.ID,
 				"title": existing.Title,
@@ -372,6 +375,8 @@ func (s *Service) HandleAlertEvent(ctx context.Context, evt alert.Event) {
 		s.logger.Error("failed to create auto incident", "error", err)
 		return
 	}
+
+	s.logger.Info("status: auto-incident created", "incident_id", incID, "title", inc.Title, "severity", inc.Severity)
 
 	s.broadcast("status.incident_created", map[string]interface{}{
 		"id":         incID,

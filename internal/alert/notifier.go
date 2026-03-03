@@ -83,6 +83,7 @@ func (n *Notifier) SMTPConfigured() bool {
 
 // Start begins the worker pool. Call in a goroutine.
 func (n *Notifier) Start(ctx context.Context) {
+	n.logger.Info("alert notifier: started", "workers", notifierWorkerCount)
 	for i := 0; i < notifierWorkerCount; i++ {
 		go n.worker(ctx)
 	}
@@ -151,6 +152,11 @@ func (n *Notifier) processJob(ctx context.Context, job NotificationJob) {
 					n.logger.Error("notifier: update delivery status", "error", updateErr)
 				}
 			}
+			n.logger.Debug("alert notifier: delivered",
+				"alert_id", job.Alert.ID,
+				"channel_id", job.Channel.ID,
+				"channel_type", channelType,
+			)
 			return
 		}
 
@@ -192,6 +198,10 @@ func (n *Notifier) processEmailJob(ctx context.Context, job NotificationJob, eve
 					n.logger.Error("notifier: update delivery status", "error", updateErr)
 				}
 			}
+			n.logger.Debug("alert notifier: email delivered",
+				"alert_id", job.Alert.ID,
+				"channel_id", job.Channel.ID,
+			)
 			return
 		}
 
@@ -204,6 +214,10 @@ func (n *Notifier) processEmailJob(ctx context.Context, job NotificationJob, eve
 }
 
 func (n *Notifier) sendWebhook(ctx context.Context, ch *NotificationChannel, body []byte) error {
+	n.logger.Debug("alert notifier: sending webhook",
+		"url", ch.URL,
+		"channel_type", ch.Type,
+	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ch.URL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)

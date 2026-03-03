@@ -165,6 +165,7 @@ func (s *Service) evaluateAlerts(ctx context.Context, snap *ResourceSnapshot) {
 		return
 	}
 	if cfg == nil || !cfg.Enabled {
+		s.logger.Debug("resource: alerts not configured", "container_id", snap.ContainerID)
 		return
 	}
 
@@ -178,12 +179,14 @@ func (s *Service) evaluateAlerts(ctx context.Context, snap *ResourceSnapshot) {
 
 	if cpuBreaching {
 		cfg.CPUConsecutiveBreaches++
+		s.logger.Debug("resource: breach detected", "container_id", snap.ContainerID, "metric", "cpu", "consecutive", cfg.CPUConsecutiveBreaches, "threshold", cfg.CPUThreshold, "value", snap.CPUPercent)
 	} else {
 		cfg.CPUConsecutiveBreaches = 0
 	}
 
 	if memBreaching {
 		cfg.MemConsecutiveBreaches++
+		s.logger.Debug("resource: breach detected", "container_id", snap.ContainerID, "metric", "memory", "consecutive", cfg.MemConsecutiveBreaches, "threshold", cfg.MemThreshold, "value", memPercent)
 	} else {
 		cfg.MemConsecutiveBreaches = 0
 	}
@@ -261,6 +264,10 @@ func (s *Service) evaluateAlerts(ctx context.Context, snap *ResourceSnapshot) {
 				"timestamp":      now,
 			})
 		}
+	}
+
+	if newState == prevState {
+		s.logger.Debug("resource: alert state unchanged", "container_id", snap.ContainerID, "state", string(newState))
 	}
 
 	cfg.AlertState = newState

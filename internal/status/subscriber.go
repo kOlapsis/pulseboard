@@ -49,6 +49,7 @@ func generateToken() (string, error) {
 
 // Subscribe creates a new subscriber with double opt-in.
 func (s *SubscriberService) Subscribe(ctx context.Context, email string) error {
+	s.logger.Info("status: new subscription request", "email", email)
 	confirmToken, err := generateToken()
 	if err != nil {
 		return fmt.Errorf("generate confirm token: %w", err)
@@ -96,6 +97,7 @@ func (s *SubscriberService) Confirm(ctx context.Context, token string) error {
 	if sub.ConfirmExpires != nil && sub.ConfirmExpires.Before(time.Now()) {
 		return fmt.Errorf("confirmation token expired")
 	}
+	s.logger.Info("status: subscription confirmed", "email", sub.Email)
 	return s.store.ConfirmSubscriber(ctx, sub.ID)
 }
 
@@ -105,12 +107,14 @@ func (s *SubscriberService) Unsubscribe(ctx context.Context, token string) error
 	if err != nil || sub == nil {
 		return fmt.Errorf("invalid unsubscribe token")
 	}
+	s.logger.Info("status: unsubscribed", "email", sub.Email)
 	return s.store.DeleteSubscriber(ctx, sub.ID)
 }
 
 // NotifyAll sends an incident notification to all confirmed subscribers.
 func (s *SubscriberService) NotifyAll(ctx context.Context, subject, message string) {
 	if s.smtp == nil {
+		s.logger.Debug("status: SMTP not configured, skipping notification")
 		return
 	}
 
@@ -119,6 +123,8 @@ func (s *SubscriberService) NotifyAll(ctx context.Context, subject, message stri
 		s.logger.Error("failed to list subscribers for notification", "error", err)
 		return
 	}
+
+	s.logger.Debug("status: sending notifications", "count", len(subs), "subject", subject)
 
 	for _, sub := range subs {
 		unsubURL := fmt.Sprintf("%s/status/unsubscribe?token=%s", s.baseURL, sub.UnsubToken)
@@ -142,6 +148,7 @@ func (s *SubscriberService) CleanExpired(ctx context.Context) (int64, error) {
 
 // Start runs periodic cleanup of expired unconfirmed subscribers.
 func (s *SubscriberService) Start(ctx context.Context) {
+	s.logger.Info("status: subscriber cleanup loop started")
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 	for {

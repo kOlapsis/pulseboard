@@ -145,6 +145,13 @@ func (e *Engine) processEvent(ctx context.Context, evt Event) {
 	if exists {
 		if severityRank(evt.Severity) > severityRank(existing.Severity) {
 			e.escalateAlert(ctx, existing, evt)
+		} else {
+			e.logger.Debug("alert: dedup, skipping duplicate",
+				"source", evt.Source,
+				"alert_type", evt.AlertType,
+				"entity_type", evt.EntityType,
+				"entity_id", evt.EntityID,
+			)
 		}
 		return
 	}
@@ -174,6 +181,12 @@ func (e *Engine) processEvent(ctx context.Context, evt Event) {
 	silenced := e.checkSilenceRules(ctx, evt)
 	if silenced {
 		a.Status = StatusSilenced
+		e.logger.Debug("alert: silenced by rule",
+			"alert_id", a.ID,
+			"source", evt.Source,
+			"entity_name", evt.EntityName,
+			"alert_type", evt.AlertType,
+		)
 	}
 
 	// Persist the alert
@@ -265,7 +278,12 @@ func (e *Engine) processRecovery(ctx context.Context, evt Event) {
 	e.mu.Unlock()
 
 	if !exists {
-		// No active alert to resolve — recovery without prior alert
+		e.logger.Debug("alert: recovery without active alert",
+			"source", evt.Source,
+			"alert_type", evt.AlertType,
+			"entity_type", evt.EntityType,
+			"entity_id", evt.EntityID,
+		)
 		return
 	}
 
@@ -330,6 +348,11 @@ func (e *Engine) checkSilenceRules(ctx context.Context, evt Event) bool {
 
 	for _, rule := range rules {
 		if matchesSilenceRule(rule, evt) {
+			e.logger.Debug("alert: silence rule matched",
+				"rule_id", rule.ID,
+				"source", evt.Source,
+				"entity_type", evt.EntityType,
+			)
 			return true
 		}
 	}
@@ -373,15 +396,21 @@ func (e *Engine) dispatchNotifications(ctx context.Context, a *Alert) {
 
 	for _, ch := range channels {
 		if !ch.Enabled {
+			e.logger.Debug("alert: channel skipped, disabled",
+				"channel_id", ch.ID,
+				"channel_name", ch.Name,
+			)
 			continue
 		}
 
-		// Evaluate routing rules
 		if !matchesRoutingRules(ch, a) {
+			e.logger.Debug("alert: channel skipped, routing mismatch",
+				"channel_id", ch.ID,
+				"channel_name", ch.Name,
+			)
 			continue
 		}
 
-		// Create delivery record
 		delivery := &NotificationDelivery{
 			AlertID:   a.ID,
 			ChannelID: ch.ID,
@@ -394,7 +423,11 @@ func (e *Engine) dispatchNotifications(ctx context.Context, a *Alert) {
 		}
 		delivery.ID = deliveryID
 
-		// Enqueue to notifier
+		e.logger.Debug("alert: dispatching notification",
+			"channel_id", ch.ID,
+			"channel_type", ch.Type,
+			"alert_id", a.ID,
+		)
 		e.notifier.Enqueue(NotificationJob{
 			Delivery: delivery,
 			Channel:  ch,

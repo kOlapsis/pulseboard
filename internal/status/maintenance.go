@@ -47,10 +47,10 @@ func NewMaintenanceScheduler(
 
 // Start begins the scheduler loop with 60-second polling interval.
 func (s *MaintenanceScheduler) Start(ctx context.Context) {
+	s.logger.Info("status: maintenance scheduler started")
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
-	// Run once immediately
 	s.applyTransitions(ctx)
 
 	for {
@@ -75,7 +75,6 @@ func (s *MaintenanceScheduler) applyTransitions(ctx context.Context) {
 		s.activateWindow(ctx, &mw)
 	}
 
-	// Deactivate expired windows
 	expired, err := s.maintenance.GetPendingDeactivation(ctx, now)
 	if err != nil {
 		s.logger.Error("failed to get pending deactivations", "error", err)
@@ -83,6 +82,8 @@ func (s *MaintenanceScheduler) applyTransitions(ctx context.Context) {
 	for _, mw := range expired {
 		s.deactivateWindow(ctx, &mw)
 	}
+
+	s.logger.Debug("status: maintenance transitions", "activations", len(pending), "deactivations", len(expired))
 }
 
 func (s *MaintenanceScheduler) activateWindow(ctx context.Context, mw *MaintenanceWindow) {

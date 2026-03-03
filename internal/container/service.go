@@ -90,6 +90,7 @@ func (s *Service) SetDiscoverer(d RuntimeDiscoverer) {
 
 // ProcessEvent handles a single container/workload event.
 func (s *Service) ProcessEvent(ctx context.Context, evt ContainerEvent) {
+	s.logger.Debug("container: event received", "action", evt.Action, "external_id", evt.ExternalID)
 	switch evt.Action {
 	case "start":
 		s.handleStateChange(ctx, evt, StateRunning)
@@ -143,8 +144,8 @@ func (s *Service) handleStateChange(ctx context.Context, evt ContainerEvent, new
 
 	previousState := c.State
 
-	// Skip no-op transitions (e.g. start event when already marked running)
 	if previousState == newState {
+		s.logger.Debug("container: state unchanged, skipping", "container_id", c.ID, "state", string(previousState))
 		return
 	}
 
@@ -155,6 +156,8 @@ func (s *Service) handleStateChange(ctx context.Context, evt ContainerEvent, new
 		s.logger.Error("update container state", "id", c.ID, "error", err)
 		return
 	}
+
+	s.logger.Info("container: state changed", "container_id", c.ID, "name", c.Name, "previous_state", string(previousState), "new_state", string(newState))
 
 	// Record transition
 	transition := &StateTransition{
@@ -221,6 +224,7 @@ func (s *Service) handleDestroy(ctx context.Context, evt ContainerEvent) {
 		return
 	}
 	if c == nil {
+		s.logger.Debug("container: destroy for unknown container", "external_id", evt.ExternalID)
 		return
 	}
 
@@ -249,6 +253,7 @@ func (s *Service) handleHealthChange(ctx context.Context, evt ContainerEvent) {
 
 	previousHealth := c.HealthStatus
 	newHealth := HealthStatus(evt.HealthStatus)
+	s.logger.Debug("container: health changed", "container_id", c.ID, "name", c.Name, "previous_health", previousHealth, "new_health", string(newHealth))
 	c.HealthStatus = &newHealth
 	c.LastStateChangeAt = evt.Timestamp
 
@@ -288,6 +293,11 @@ func (s *Service) GetContainer(ctx context.Context, id int64) (*Container, error
 	return s.store.GetContainerByID(ctx, id)
 }
 
+// DeleteContainer removes a container and its transitions from the database.
+func (s *Service) DeleteContainer(ctx context.Context, id int64) error {
+	return s.store.DeleteContainerByID(ctx, id)
+}
+
 // ListContainers returns containers matching the given options.
 func (s *Service) ListContainers(ctx context.Context, opts ListContainersOpts) ([]*Container, error) {
 	return s.store.ListContainers(ctx, opts)
@@ -306,11 +316,12 @@ func (s *Service) Reconcile(ctx context.Context, discoverer RuntimeDiscoverer) e
 		currentByExternalID[c.ExternalID] = c
 	}
 
-	// Get stored containers
 	stored, err := s.store.ListContainers(ctx, ListContainersOpts{IncludeArchived: false, IncludeIgnored: true})
 	if err != nil {
 		return fmt.Errorf("reconcile list stored: %w", err)
 	}
+
+	s.logger.Info("container: reconcile started", "stored_count", len(stored), "discovered_count", len(current))
 
 	now := time.Now()
 
@@ -384,6 +395,8 @@ func (s *Service) Reconcile(ctx context.Context, discoverer RuntimeDiscoverer) e
 			s.emitEvent("container.discovered", dc)
 		}
 	}
+
+	s.logger.Info("container: reconcile completed")
 
 	return nil
 }

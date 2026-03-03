@@ -79,6 +79,7 @@ func (s *Service) EnsureAutoDetected(ctx context.Context, endpointID int64, targ
 		return nil, fmt.Errorf("get monitor by endpoint: %w", err)
 	}
 	if existing != nil {
+		s.logger.Debug("certificate: auto-detection skipped, monitor exists", "hostname", hostname, "port", port)
 		return existing, nil
 	}
 
@@ -88,6 +89,7 @@ func (s *Service) EnsureAutoDetected(ctx context.Context, endpointID int64, targ
 		return nil, fmt.Errorf("get monitor by host:port: %w", err)
 	}
 	if existing != nil {
+		s.logger.Debug("certificate: auto-detection skipped, monitor exists", "hostname", hostname, "port", port)
 		return existing, nil
 	}
 
@@ -300,7 +302,7 @@ func (s *Service) SyncFromLabels(ctx context.Context, containerExternalID string
 		}
 
 		if existing != nil {
-			// Already monitored — skip (regardless of source)
+			s.logger.Debug("certificate: label monitor exists, skipping", "hostname", p.Hostname, "port", p.Port)
 			continue
 		}
 
@@ -402,6 +404,7 @@ func (s *Service) ListCheckResults(ctx context.Context, monitorID int64, opts Li
 // Start starts a background goroutine that periodically checks
 // standalone certificate monitors that are due for a check.
 func (s *Service) Start(ctx context.Context) {
+	s.logger.Info("certificate: scheduler started", "interval", "60s")
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
@@ -422,6 +425,8 @@ func (s *Service) runScheduledChecks(ctx context.Context) {
 		return
 	}
 
+	s.logger.Debug("certificate: scheduled check run", "due_count", len(monitors))
+
 	if len(monitors) == 0 {
 		return
 	}
@@ -437,6 +442,7 @@ func (s *Service) runScheduledChecks(ctx context.Context) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
+			s.logger.Debug("certificate: checking", "hostname", monitor.Hostname, "port", monitor.Port, "source", string(monitor.Source))
 			result := CheckCertificate(monitor.Hostname, monitor.Port, 10*time.Second)
 			s.processCheckResult(ctx, monitor, result)
 		}(m)
@@ -521,9 +527,12 @@ func (s *Service) processCheckResult(ctx context.Context, monitor *CertMonitor, 
 		s.logger.Error("update cert monitor", "error", err, "monitor_id", monitor.ID)
 	}
 
+	s.logger.Debug("certificate: check result", "monitor_id", monitor.ID, "hostname", monitor.Hostname, "status", string(monitor.Status), "days_remaining", result.DaysRemaining())
+
 	// Broadcast SSE events
 	s.emitCheckCompleted(monitor, result)
 	if previousStatus != monitor.Status {
+		s.logger.Debug("certificate: status changed", "monitor_id", monitor.ID, "hostname", monitor.Hostname, "previous_status", string(previousStatus), "new_status", string(monitor.Status))
 		s.emit("certificate.status_changed", map[string]interface{}{
 			"monitor_id":      monitor.ID,
 			"hostname":        monitor.Hostname,
@@ -623,6 +632,7 @@ func (s *Service) evaluateAlerts(ctx context.Context, monitor *CertMonitor, resu
 	}
 
 	if crossedThreshold == nil {
+		s.logger.Debug("certificate: alert evaluation, no action", "monitor_id", monitor.ID, "hostname", monitor.Hostname, "days_remaining", daysRemaining)
 		// No threshold crossed — check if we need a recovery alert
 		if monitor.LastAlertedThreshold != nil {
 			// Certificate renewed, past all thresholds
@@ -639,6 +649,8 @@ func (s *Service) evaluateAlerts(ctx context.Context, monitor *CertMonitor, resu
 		}
 		return
 	}
+
+	s.logger.Debug("certificate: alert threshold crossed", "monitor_id", monitor.ID, "hostname", monitor.Hostname, "days_remaining", daysRemaining, "threshold", *crossedThreshold)
 
 	// Check if we need to escalate (fire alert at a new, lower threshold)
 	if monitor.LastAlertedThreshold == nil || *crossedThreshold < *monitor.LastAlertedThreshold {

@@ -76,6 +76,7 @@ func (s *Service) Stop() {
 // SyncEndpoints synchronizes endpoint definitions from container labels with the store and check engine.
 func (s *Service) SyncEndpoints(ctx context.Context, containerName, externalID string, labels map[string]string, orchestrationGroup, orchestrationUnit string) {
 	parsed, parseErrors := ParseEndpointLabels(labels, s.logger)
+	s.logger.Debug("endpoint: sync started", "external_id", externalID, "count", len(parsed))
 
 	// Emit config errors
 	for _, pe := range parseErrors {
@@ -202,8 +203,10 @@ func (s *Service) ProcessCheckResult(ctx context.Context, endpointID int64, resu
 		s.logger.Error("insert check result", "endpoint_id", endpointID, "error", err)
 	}
 
-	// Emit status change if applicable
+	s.logger.Debug("endpoint: check result processed", "endpoint_id", endpointID, "target", ep.Target, "success", result.Success, "response_time_ms", result.ResponseTimeMs, "status", string(newStatus))
+
 	if newStatus != previousStatus {
+		s.logger.Debug("endpoint: status changed", "endpoint_id", endpointID, "previous_status", string(previousStatus), "new_status", string(newStatus))
 		s.emitEvent("endpoint.status_changed", map[string]interface{}{
 			"endpoint_id":      endpointID,
 			"container_name":   ep.ContainerName,
@@ -235,7 +238,8 @@ func (s *Service) ProcessCheckResult(ctx context.Context, endpointID int64, resu
 					result.ResponseTimeMs, result.HTTPStatus, result.ErrorMessage); err != nil {
 					s.logger.Error("update alert state", "endpoint_id", endpointID, "error", err)
 				}
-				s.emitEvent(eventType, eventData)
+				s.logger.Debug("endpoint: alert triggered", "endpoint_id", endpointID, "event_type", eventType)
+			s.emitEvent(eventType, eventData)
 			}
 		}
 	}
@@ -250,6 +254,7 @@ func (s *Service) HandleContainerStop(ctx context.Context, externalID string) {
 	}
 
 	for _, ep := range endpoints {
+		s.logger.Debug("endpoint: pausing check for stopped container", "endpoint_id", ep.ID)
 		s.engine.RemoveEndpoint(ep.ID)
 		if err := s.store.UpdateCheckResult(ctx, ep.ID, StatusUnknown, ep.AlertState,
 			ep.ConsecutiveFailures, ep.ConsecutiveSuccesses,
@@ -282,6 +287,7 @@ func (s *Service) HandleContainerDestroy(ctx context.Context, externalID string)
 	}
 
 	for _, ep := range endpoints {
+		s.logger.Debug("endpoint: deactivating endpoint", "endpoint_id", ep.ID)
 		s.engine.RemoveEndpoint(ep.ID)
 		if err := s.store.DeactivateEndpoint(ctx, ep.ID); err != nil {
 			s.logger.Error("deactivate endpoint on destroy", "endpoint_id", ep.ID, "error", err)
