@@ -236,6 +236,151 @@ func (s *UpdateStore) DeleteImageUpdatesByContainer(ctx context.Context, contain
 	return nil
 }
 
+// --- CVE cache ---
+
+func (s *UpdateStore) InsertCVECacheEntry(ctx context.Context, e *update.CVECacheEntry) (int64, error) {
+	res, err := s.writer.Exec(ctx,
+		`INSERT OR REPLACE INTO cve_cache
+		(ecosystem, package_name, package_version, cve_id, cvss_score, cvss_vector, severity,
+		 summary, fixed_in, references_json, fetched_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.Ecosystem, e.PackageName, e.PackageVersion, e.CVEID, e.CVSSScore, e.CVSSVector,
+		string(e.Severity), e.Summary, e.FixedIn, e.ReferencesJSON,
+		e.FetchedAt.Unix(), e.ExpiresAt.Unix(),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert cve cache entry: %w", err)
+	}
+	e.ID = res.LastInsertID
+	return res.LastInsertID, nil
+}
+
+func (s *UpdateStore) GetCVECacheEntries(ctx context.Context, ecosystem, packageName, packageVersion string) ([]*update.CVECacheEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, ecosystem, package_name, package_version, cve_id, cvss_score, cvss_vector,
+		 severity, summary, fixed_in, references_json, fetched_at, expires_at
+		FROM cve_cache WHERE ecosystem = ? AND package_name = ? AND package_version = ?`,
+		ecosystem, packageName, packageVersion)
+	if err != nil {
+		return nil, fmt.Errorf("get cve cache entries: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*update.CVECacheEntry
+	for rows.Next() {
+		e, err := scanCVECacheEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, e)
+	}
+	return result, rows.Err()
+}
+
+func (s *UpdateStore) IsCVECacheFresh(ctx context.Context, ecosystem, packageName, packageVersion string) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM cve_cache
+		WHERE ecosystem = ? AND package_name = ? AND package_version = ? AND expires_at > ?`,
+		ecosystem, packageName, packageVersion, time.Now().Unix(),
+	).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("check cve cache freshness: %w", err)
+	}
+	return count > 0, nil
+}
+
+// --- Container CVEs ---
+
+func (s *UpdateStore) UpsertContainerCVE(ctx context.Context, c *update.ContainerCVE) error {
+	_, err := s.writer.Exec(ctx,
+		`INSERT INTO container_cves (container_id, cve_id, severity, cvss_score, summary, fixed_in, first_detected_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(container_id, cve_id) DO UPDATE SET
+			severity=excluded.severity, cvss_score=excluded.cvss_score,
+			summary=excluded.summary, fixed_in=excluded.fixed_in`,
+		c.ContainerID, c.CVEID, string(c.Severity), c.CVSSScore, c.Summary, c.FixedIn,
+		c.FirstDetectedAt.Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("upsert container cve: %w", err)
+	}
+	return nil
+}
+
+func (s *UpdateStore) ListContainerCVEs(ctx context.Context, containerID string) ([]*update.ContainerCVE, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, container_id, cve_id, severity, cvss_score, summary, fixed_in, first_detected_at, resolved_at
+		FROM container_cves WHERE container_id = ? AND resolved_at IS NULL ORDER BY cvss_score DESC`, containerID)
+	if err != nil {
+		return nil, fmt.Errorf("list container cves: %w", err)
+	}
+	defer rows.Close()
+	return collectContainerCVEs(rows)
+}
+
+func (s *UpdateStore) ListAllActiveCVEs(ctx context.Context, opts update.ListCVEsOpts) ([]*update.ContainerCVE, error) {
+	query := `SELECT id, container_id, cve_id, severity, cvss_score, summary, fixed_in, first_detected_at, resolved_at
+		FROM container_cves WHERE resolved_at IS NULL`
+	var args []interface{}
+
+	if opts.Severity != "" {
+		query += " AND severity = ?"
+		args = append(args, opts.Severity)
+	}
+	if opts.ContainerID != "" {
+		query += " AND container_id = ?"
+		args = append(args, opts.ContainerID)
+	}
+	query += " ORDER BY cvss_score DESC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list all active cves: %w", err)
+	}
+	defer rows.Close()
+	return collectContainerCVEs(rows)
+}
+
+func (s *UpdateStore) ResolveContainerCVE(ctx context.Context, containerID, cveID string) error {
+	_, err := s.writer.Exec(ctx,
+		`UPDATE container_cves SET resolved_at = ? WHERE container_id = ? AND cve_id = ? AND resolved_at IS NULL`,
+		time.Now().Unix(), containerID, cveID,
+	)
+	if err != nil {
+		return fmt.Errorf("resolve container cve: %w", err)
+	}
+	return nil
+}
+
+func (s *UpdateStore) DeleteContainerCVEs(ctx context.Context, containerID string) error {
+	_, err := s.writer.Exec(ctx, `DELETE FROM container_cves WHERE container_id = ?`, containerID)
+	if err != nil {
+		return fmt.Errorf("delete container cves: %w", err)
+	}
+	return nil
+}
+
+func (s *UpdateStore) GetCVESummaryCounts(ctx context.Context) (map[string]int, error) {
+	counts := map[string]int{"critical": 0, "high": 0, "medium": 0, "low": 0}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT severity, COUNT(*) FROM container_cves WHERE resolved_at IS NULL GROUP BY severity`)
+	if err != nil {
+		return nil, fmt.Errorf("get cve summary counts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var sev string
+		var count int
+		if err := rows.Scan(&sev, &count); err != nil {
+			return nil, err
+		}
+		counts[sev] = count
+	}
+	return counts, rows.Err()
+}
+
 // --- Version pins ---
 
 func (s *UpdateStore) InsertVersionPin(ctx context.Context, p *update.VersionPin) (int64, error) {
@@ -330,6 +475,14 @@ func (s *UpdateStore) CleanupExpired(ctx context.Context, olderThan time.Time) (
 	}
 	totalDeleted += res.RowsAffected
 
+	// CVE cache uses expiry-based cleanup
+	res, err = s.writer.Exec(ctx,
+		`DELETE FROM cve_cache WHERE expires_at < ?`, time.Now().Unix())
+	if err != nil {
+		return totalDeleted, fmt.Errorf("cleanup cve cache: %w", err)
+	}
+	totalDeleted += res.RowsAffected
+
 	return totalDeleted, nil
 }
 
@@ -408,6 +561,91 @@ func collectImageUpdates(rows *sql.Rows) ([]*update.ImageUpdate, error) {
 			return nil, err
 		}
 		result = append(result, u)
+	}
+	return result, rows.Err()
+}
+
+func scanCVECacheEntry(row updateRowScanner) (*update.CVECacheEntry, error) {
+	var e update.CVECacheEntry
+	var fetchedAt, expiresAt int64
+	var cvssVector, summary, fixedIn, referencesJSON sql.NullString
+	var cvssScore sql.NullFloat64
+
+	err := row.Scan(
+		&e.ID, &e.Ecosystem, &e.PackageName, &e.PackageVersion, &e.CVEID,
+		&cvssScore, &cvssVector, &e.Severity, &summary, &fixedIn, &referencesJSON,
+		&fetchedAt, &expiresAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	e.FetchedAt = time.Unix(fetchedAt, 0)
+	e.ExpiresAt = time.Unix(expiresAt, 0)
+	if cvssScore.Valid {
+		e.CVSSScore = cvssScore.Float64
+	}
+	if cvssVector.Valid {
+		e.CVSSVector = cvssVector.String
+	}
+	if summary.Valid {
+		e.Summary = summary.String
+	}
+	if fixedIn.Valid {
+		e.FixedIn = fixedIn.String
+	}
+	if referencesJSON.Valid {
+		e.ReferencesJSON = referencesJSON.String
+	}
+	return &e, nil
+}
+
+func scanContainerCVE(row updateRowScanner) (*update.ContainerCVE, error) {
+	var c update.ContainerCVE
+	var firstDetectedAt int64
+	var resolvedAt sql.NullInt64
+	var cvssScore sql.NullFloat64
+	var summary, fixedIn sql.NullString
+
+	err := row.Scan(
+		&c.ID, &c.ContainerID, &c.CVEID, &c.Severity,
+		&cvssScore, &summary, &fixedIn, &firstDetectedAt, &resolvedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	c.FirstDetectedAt = time.Unix(firstDetectedAt, 0)
+	if resolvedAt.Valid {
+		t := time.Unix(resolvedAt.Int64, 0)
+		c.ResolvedAt = &t
+	}
+	if cvssScore.Valid {
+		c.CVSSScore = cvssScore.Float64
+	}
+	if summary.Valid {
+		c.Summary = summary.String
+	}
+	if fixedIn.Valid {
+		c.FixedIn = fixedIn.String
+	}
+	return &c, nil
+}
+
+func collectContainerCVEs(rows *sql.Rows) ([]*update.ContainerCVE, error) {
+	var result []*update.ContainerCVE
+	for rows.Next() {
+		c, err := scanContainerCVE(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, c)
 	}
 	return result, rows.Err()
 }

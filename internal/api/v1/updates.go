@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kolapsis/maintenant/internal/extension"
 	"github.com/kolapsis/maintenant/internal/update"
 )
 
@@ -76,12 +77,20 @@ func (h *UpdateHandler) HandleGetUpdateSummary(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	WriteJSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"last_scan":   h.service.GetLastScanTime(),
 		"next_scan":   h.service.GetNextScanTime(),
 		"scan_status": scanStatus,
 		"counts":      summary,
-	})
+	}
+
+	if extension.CurrentEdition() == extension.Enterprise {
+		if cveCounts, err := h.store.GetCVESummaryCounts(r.Context()); err == nil {
+			resp["cve_counts"] = cveCounts
+		}
+	}
+
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 // HandleGetContainerUpdate handles GET /api/v1/updates/{container_id}.
@@ -107,6 +116,23 @@ func (h *UpdateHandler) HandleGetContainerUpdate(w http.ResponseWriter, r *http.
 
 	resp := imageUpdateToMap(u)
 	resp["pinned"] = pin != nil
+
+	if extension.CurrentEdition() == extension.Enterprise {
+		if cves, err := h.store.ListContainerCVEs(r.Context(), containerID); err == nil {
+			cveMaps := make([]map[string]interface{}, 0, len(cves))
+			for _, c := range cves {
+				cveMaps = append(cveMaps, map[string]interface{}{
+					"cve_id":            c.CVEID,
+					"cvss_score":        c.CVSSScore,
+					"severity":          string(c.Severity),
+					"summary":           c.Summary,
+					"fixed_in":          c.FixedIn,
+					"first_detected_at": c.FirstDetectedAt,
+				})
+			}
+			resp["active_cves"] = cveMaps
+		}
+	}
 
 	WriteJSON(w, http.StatusOK, resp)
 }

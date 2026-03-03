@@ -17,11 +17,11 @@ import "time"
 type UpdateType string
 
 const (
-	UpdateTypeMajor     UpdateType = "major"
-	UpdateTypeMinor     UpdateType = "minor"
-	UpdateTypePatch     UpdateType = "patch"
+	UpdateTypeMajor      UpdateType = "major"
+	UpdateTypeMinor      UpdateType = "minor"
+	UpdateTypePatch      UpdateType = "patch"
 	UpdateTypeDigestOnly UpdateType = "digest_only"
-	UpdateTypeUnknown   UpdateType = "unknown"
+	UpdateTypeUnknown    UpdateType = "unknown"
 )
 
 // UpdateStatus represents the lifecycle status of a detected update.
@@ -52,32 +52,32 @@ const (
 
 // ScanRecord stores the result of each periodic scan cycle.
 type ScanRecord struct {
-	ID                 int64      `json:"id"`
-	StartedAt          time.Time  `json:"started_at"`
-	CompletedAt        *time.Time `json:"completed_at,omitempty"`
-	ContainersScanned  int        `json:"containers_scanned"`
-	UpdatesFound       int        `json:"updates_found"`
-	Errors             int        `json:"errors"`
-	Status             ScanStatus `json:"status"`
+	ID                int64      `json:"id"`
+	StartedAt         time.Time  `json:"started_at"`
+	CompletedAt       *time.Time `json:"completed_at,omitempty"`
+	ContainersScanned int        `json:"containers_scanned"`
+	UpdatesFound      int        `json:"updates_found"`
+	Errors            int        `json:"errors"`
+	Status            ScanStatus `json:"status"`
 }
 
 // ImageUpdate stores a detected update per container image.
 type ImageUpdate struct {
-	ID                 int64        `json:"id"`
-	ScanID             int64        `json:"scan_id"`
-	ContainerID        string       `json:"container_id"`
-	ContainerName      string       `json:"container_name"`
-	Image              string       `json:"image"`
-	CurrentTag         string       `json:"current_tag"`
-	CurrentDigest      string       `json:"current_digest"`
-	Registry           string       `json:"registry"`
-	LatestTag          string       `json:"latest_tag,omitempty"`
-	LatestDigest       string       `json:"latest_digest,omitempty"`
-	UpdateType         UpdateType   `json:"update_type,omitempty"`
-	RiskScore          int          `json:"risk_score"`
-	PublishedAt        *time.Time   `json:"published_at,omitempty"`
-	Status             UpdateStatus `json:"status"`
-	DetectedAt         time.Time    `json:"detected_at"`
+	ID            int64        `json:"id"`
+	ScanID        int64        `json:"scan_id"`
+	ContainerID   string       `json:"container_id"`
+	ContainerName string       `json:"container_name"`
+	Image         string       `json:"image"`
+	CurrentTag    string       `json:"current_tag"`
+	CurrentDigest string       `json:"current_digest"`
+	Registry      string       `json:"registry"`
+	LatestTag     string       `json:"latest_tag,omitempty"`
+	LatestDigest  string       `json:"latest_digest,omitempty"`
+	UpdateType    UpdateType   `json:"update_type,omitempty"`
+	RiskScore     int          `json:"risk_score"`
+	PublishedAt   *time.Time   `json:"published_at,omitempty"`
+	Status        UpdateStatus `json:"status"`
+	DetectedAt    time.Time    `json:"detected_at"`
 }
 
 // BaseRiskScore returns a risk score based on semver update type.
@@ -136,6 +136,52 @@ type ScanError struct {
 	ContainerName string
 	Image         string
 	Error         error
+}
+
+// CVESeverity classifies the severity of a CVE.
+type CVESeverity string
+
+const (
+	CVESeverityCritical CVESeverity = "critical"
+	CVESeverityHigh     CVESeverity = "high"
+	CVESeverityMedium   CVESeverity = "medium"
+	CVESeverityLow      CVESeverity = "low"
+)
+
+// CVECacheEntry caches CVE lookup results from OSV.dev.
+type CVECacheEntry struct {
+	ID             int64       `json:"id"`
+	Ecosystem      string      `json:"ecosystem"`
+	PackageName    string      `json:"package_name"`
+	PackageVersion string      `json:"package_version"`
+	CVEID          string      `json:"cve_id"`
+	CVSSScore      float64     `json:"cvss_score"`
+	CVSSVector     string      `json:"cvss_vector"`
+	Severity       CVESeverity `json:"severity"`
+	Summary        string      `json:"summary"`
+	FixedIn        string      `json:"fixed_in"`
+	ReferencesJSON string      `json:"references_json"`
+	FetchedAt      time.Time   `json:"fetched_at"`
+	ExpiresAt      time.Time   `json:"expires_at"`
+}
+
+// ContainerCVE links a container to an active CVE.
+type ContainerCVE struct {
+	ID              int64       `json:"id"`
+	ContainerID     string      `json:"container_id"`
+	CVEID           string      `json:"cve_id"`
+	Severity        CVESeverity `json:"severity"`
+	CVSSScore       float64     `json:"cvss_score"`
+	Summary         string      `json:"summary"`
+	FixedIn         string      `json:"fixed_in"`
+	FirstDetectedAt time.Time   `json:"first_detected_at"`
+	ResolvedAt      *time.Time  `json:"resolved_at,omitempty"`
+}
+
+// ListCVEsOpts contains filter parameters for listing CVEs.
+type ListCVEsOpts struct {
+	Severity    string
+	ContainerID string
 }
 
 // UpdateConfig holds parsed maintenant.update.* label values.

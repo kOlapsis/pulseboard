@@ -372,6 +372,11 @@ func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore upd
 	r.mux.HandleFunc("POST /api/v1/updates/pin/{container_id}", uh.HandlePinVersion)
 	r.mux.HandleFunc("DELETE /api/v1/updates/pin/{container_id}", uh.HandleUnpinVersion)
 
+	// CVE routes (edition-gated in handler)
+	ch := NewCVEHandler(updateStore)
+	r.mux.HandleFunc("GET /api/v1/cve", ch.HandleListCVEs)
+	r.mux.HandleFunc("GET /api/v1/cve/{container_id}", ch.HandleGetContainerCVEs)
+
 	// Wire SSE broadcasting
 	updateSvc.SetEventCallback(func(eventType string, data interface{}) {
 		r.broker.Broadcast(SSEEvent{Type: eventType, Data: data})

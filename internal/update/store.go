@@ -43,6 +43,19 @@ type UpdateStore interface {
 	ListExclusions(ctx context.Context) ([]*UpdateExclusion, error)
 	DeleteExclusion(ctx context.Context, id int64) error
 
+	// CVE cache
+	InsertCVECacheEntry(ctx context.Context, e *CVECacheEntry) (int64, error)
+	GetCVECacheEntries(ctx context.Context, ecosystem, packageName, packageVersion string) ([]*CVECacheEntry, error)
+	IsCVECacheFresh(ctx context.Context, ecosystem, packageName, packageVersion string) (bool, error)
+
+	// Container CVEs
+	UpsertContainerCVE(ctx context.Context, c *ContainerCVE) error
+	ListContainerCVEs(ctx context.Context, containerID string) ([]*ContainerCVE, error)
+	ListAllActiveCVEs(ctx context.Context, opts ListCVEsOpts) ([]*ContainerCVE, error)
+	ResolveContainerCVE(ctx context.Context, containerID, cveID string) error
+	DeleteContainerCVEs(ctx context.Context, containerID string) error
+	GetCVESummaryCounts(ctx context.Context) (map[string]int, error)
+
 	// Retention cleanup
 	CleanupExpired(ctx context.Context, olderThan time.Time) (int64, error)
 }
