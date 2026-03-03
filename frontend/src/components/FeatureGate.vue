@@ -28,7 +28,7 @@ const enabled = computed(() => edition.value?.features[props.feature] === true)
 
 <template>
   <slot v-if="enabled" />
-  <template v-else-if="enabled === false">
+  <template v-else-if="!enabled">
     <slot name="placeholder">
       <!-- Default placeholder when no custom one is provided -->
       <div v-if="title" class="relative w-full rounded-xl border border-zinc-800 bg-[#12151C] px-5 py-5">

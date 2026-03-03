@@ -168,6 +168,7 @@ const features = [
             </div>
             <a
               href="https://buy.stripe.com/test_4gMfZhcZ0fe977N88I2go00"
+              target="_blank"
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'monthly'
@@ -200,6 +201,7 @@ const features = [
             <p class="text-xs text-emerald-400 mb-3">7.50€/month — save 18€</p>
             <a
               href="https://buy.stripe.com/test_bJe14n0ceea51Nt3Ss2go01"
+              target="_blank"
               class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
               :class="
                 billingPeriod === 'annual'
@@ -210,6 +212,17 @@ const features = [
               Get started
             </a>
           </div>
+        </div>
+
+        <!-- License delivery notice -->
+        <div
+          class="mt-6 flex items-start gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-5 py-4"
+        >
+          <Mail :size="18" class="text-blue-400 shrink-0 mt-0.5" />
+          <p class="text-sm text-slate-300 leading-relaxed">
+            After purchase, your license key will be sent to the email address provided during
+            checkout.
+          </p>
         </div>
 
         <!-- Feature checklist -->
