@@ -76,6 +76,19 @@ DELETE /api/v1/updates/exclusions/{id}
 
 ---
 
+## CVE Enrichment & Risk Scoring :material-crown:{ title="Pro" }
+With maintenant Pro, update intelligence goes beyond digest comparison. Each available update is enriched with vulnerability data:
+
+- **CVE details** — Known vulnerabilities affecting the current and target versions
+- **Risk scoring** — Severity-weighted score to prioritize which updates matter most
+- **Changelog** — Docker image changelog between current and available versions
+
+```
+GET /api/v1/risk
+```
+
+---
+
 ## Alert Events
 
 | Event | Description | Default Severity |

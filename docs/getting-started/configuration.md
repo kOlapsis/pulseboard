@@ -17,6 +17,7 @@ maintenant is configured entirely through environment variables. No configuratio
 | `MAINTENANT_UPDATE_INTERVAL` | `24h` | Update intelligence scan interval. Accepts Go duration format (e.g., `12h`, `30m`). |
 | `MAINTENANT_K8S_NAMESPACES` | all | Kubernetes namespace allowlist (comma-separated). Empty monitors all namespaces. |
 | `MAINTENANT_K8S_EXCLUDE_NAMESPACES` | none | Kubernetes namespace blocklist (comma-separated). |
+| `MAINTENANT_LICENSE_KEY` | — | Pro license key. Enables Pro features when set to a valid key. |
 | `MAINTENANT_MCP` | `false` | Enable the MCP server on `/mcp` (Streamable HTTP transport). |
 | `MAINTENANT_MCP_ALLOWED_EMAIL` | — | Restrict MCP access to JWTs matching this email. |
 
@@ -53,6 +54,28 @@ MAINTENANT_BASE_URL=https://maintenant.example.com
 # MCP Server (Model Context Protocol for AI assistants)
 # maintenant_MCP=true
 # maintenant_MCP_ALLOWED_EMAIL=you@example.com
+```
+
+---
+
+## Pro License
+
+To enable Pro features (Slack/Teams/Email channels, CVE enrichment, incident management, maintenance windows, subscriber notifications, and more), set the `MAINTENANT_LICENSE_KEY` environment variable:
+
+```yaml
+services:
+  maintenant:
+    image: ghcr.io/kolapsis/maintenant-pro:latest
+    environment:
+      MAINTENANT_LICENSE_KEY: "your-license-key"
+```
+
+The license is verified periodically against the license server. If the server is temporarily unreachable, Pro features remain active from cache with a graceful degradation window.
+
+You can check the current license status via the API:
+
+```
+GET /api/v1/license/status
 ```
 
 ---

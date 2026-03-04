@@ -15,6 +15,7 @@
 import { computed } from 'vue'
 import { useEdition } from '@/composables/useEdition'
 import { Lock, Sparkles } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
 
 const props = defineProps<{
   feature: string
@@ -31,7 +32,10 @@ const enabled = computed(() => edition.value?.features[props.feature] === true)
   <template v-else-if="!enabled">
     <slot name="placeholder">
       <!-- Default placeholder when no custom one is provided -->
-      <div v-if="title" class="relative w-full rounded-xl border border-zinc-800 bg-[#12151C] px-5 py-5">
+      <div
+        v-if="title"
+        class="relative w-full rounded-xl border border-zinc-800 bg-[#12151C] px-5 py-5"
+      >
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
             <div class="flex items-center gap-2 mb-1">
@@ -42,12 +46,17 @@ const enabled = computed(() => edition.value?.features[props.feature] === true)
               {{ description }}
             </p>
           </div>
-          <div class="flex items-center gap-1.5 shrink-0 mt-0.5">
+          <router-link
+            :to="{ name: 'pro-edition' }"
+            class="flex items-center gap-1.5 shrink-0 mt-0.5"
+          >
             <Lock class="h-3 w-3 text-indigo-400/60" />
-            <span class="rounded-full bg-indigo-600/15 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-400">
+            <span
+              class="rounded-full bg-indigo-600/15 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-400"
+            >
               Pro
             </span>
-          </div>
+          </router-link>
         </div>
       </div>
     </slot>

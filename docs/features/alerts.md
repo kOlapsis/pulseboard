@@ -51,14 +51,21 @@ POST /api/v1/channels
 
 maintenant sends a JSON payload with alert details to the configured URL.
 
-### Pro Channels
-
+### Slack, Teams & Email :material-crown:{ title="Pro" } 
 maintenant Pro adds native Slack (Block Kit), Microsoft Teams (MessageCard), and Email (SMTP) channels with platform-specific formatting.
+
+```bash
+POST /api/v1/channels
+{
+  "name": "ops-slack",
+  "type": "slack",
+  "url": "https://hooks.slack.com/services/..."
+}
+```
 
 ---
 
-## Routing Rules
-
+## Routing Rules :material-crown:{ title="Pro" } 
 Route specific alerts to specific channels. Routing rules filter by source, severity, or entity.
 
 ```bash

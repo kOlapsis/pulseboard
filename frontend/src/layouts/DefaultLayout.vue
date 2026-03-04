@@ -114,7 +114,7 @@ const mainNav = [
               </div>
               <button
                 v-if="!isEnterprise"
-                class="block w-full py-1.5 bg-slate-700/50 text-slate-300 hover:text-slate-200 rounded-lg text-xs font-semibold text-center transition-colors"
+                class="cursor-pointer block w-full py-1.5 bg-slate-700/50 text-slate-300 hover:text-slate-200 rounded-lg text-xs font-semibold text-center transition-colors"
               >
                 Pro Edition
               </button>

@@ -29,12 +29,13 @@ maintenant collects the following metrics for each container:
 
 maintenant stores metric snapshots and displays them as interactive time-series charts (powered by uPlot). Available time ranges:
 
-| Range | Description |
-|-------|-------------|
-| 1 hour | Fine-grained, per-second resolution |
-| 6 hours | Recent activity |
-| 24 hours | Full day view |
-| 7 days | Weekly trends |
+| Range | Description | Edition |
+|-------|-------------|---------|
+| 1 hour | Fine-grained, per-second resolution | Community |
+| 6 hours | Recent activity | Community |
+| 24 hours | Full day view | :material-crown:{ title="Pro" } Pro |
+| 7 days | Weekly trends | :material-crown:{ title="Pro" } Pro |
+| 30 days | Monthly trends | :material-crown:{ title="Pro" } Pro |
 
 Access historical data via the API:
 

@@ -95,6 +95,59 @@ The status page includes:
 
 ---
 
+## Incident Management :material-crown:{ title="Pro" }
+Track and communicate incidents with timeline updates. Each incident has a severity, status, and a history of updates visible on the public status page.
+
+```bash
+# Create an incident
+POST /api/v1/status/incidents
+{
+  "title": "API latency increase",
+  "severity": "minor",
+  "message": "Investigating elevated response times on the API."
+}
+
+# Post a timeline update
+POST /api/v1/status/incidents/{id}/updates
+{
+  "status": "identified",
+  "message": "Root cause identified. Deploying fix."
+}
+```
+
+---
+
+## Maintenance Windows :material-crown:{ title="Pro" }
+Schedule planned downtime. Maintenance windows appear on the status page and automatically suppress alerts for affected components.
+
+```bash
+POST /api/v1/status/maintenance
+{
+  "title": "Database migration",
+  "starts_at": "2026-03-10T02:00:00Z",
+  "ends_at": "2026-03-10T04:00:00Z",
+  "components": [1, 3]
+}
+```
+
+---
+
+## Subscriber Notifications :material-crown:{ title="Pro" }
+Let users subscribe to status updates. Subscribers receive notifications when incidents are created or updated.
+
+```bash
+# List subscribers
+GET /api/v1/status/subscribers
+
+# Subscriber sign-up (public endpoint)
+POST /status/subscribe
+{
+  "email": "user@example.com"
+}
+```
+
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
@@ -107,6 +160,10 @@ The status page includes:
 | `POST` | `/api/v1/status/components` | Create a component |
 | `PUT` | `/api/v1/status/components/{id}` | Update a component |
 | `DELETE` | `/api/v1/status/components/{id}` | Delete a component |
+| `POST` | `/api/v1/status/incidents` | Create incident | :material-crown:{ title="Pro" } |
+| `POST` | `/api/v1/status/incidents/{id}/updates` | Post incident update | :material-crown:{ title="Pro" } |
+| `POST` | `/api/v1/status/maintenance` | Schedule maintenance | :material-crown:{ title="Pro" } |
+| `GET` | `/api/v1/status/subscribers` | List subscribers | :material-crown:{ title="Pro" } |
 
 ---
 

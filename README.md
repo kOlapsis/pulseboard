@@ -144,6 +144,7 @@ Built-in [Model Context Protocol](https://modelcontextprotocol.io/) server. Quer
 | `MAINTENANT_DB`                     | `./maintenant.db`       | SQLite database path                            |
 | `MAINTENANT_BASE_URL`               | `http://localhost:8080` | Base URL (used for heartbeat ping URLs)         |
 | `MAINTENANT_RUNTIME`                | auto-detect             | Force `docker` or `kubernetes`                  |
+| `MAINTENANT_LICENSE_KEY`            | —                       | Pro license key (enables Pro features)          |
 | `MAINTENANT_MCP`                    | `false`                 | Enable MCP server (Streamable HTTP on `/mcp`)   |
 | `MAINTENANT_K8S_NAMESPACES`         | all                     | Namespace allowlist (comma-separated)           |
 | `MAINTENANT_K8S_EXCLUDE_NAMESPACES` | none                    | Namespace blocklist                             |
@@ -366,7 +367,7 @@ Full REST API under `/api/v1/` for automation and integration.
 
 ## Editions
 
-maintenant is available in two editions:
+maintenant is fully functional out of the box. The **Pro Edition** is available for teams that need advanced alerting, vulnerability intelligence, and extended notification channels.
 
 | Feature | Community | Pro |
 |---------|:---------:|:---:|
@@ -389,7 +390,13 @@ maintenant is available in two editions:
 | Incident management | | x |
 | Subscriber notifications | | x |
 
-The Community Edition is fully functional for self-hosted monitoring. maintenant Pro adds advanced alerting, notification channels, and enterprise features.
+To activate Pro, set your license key in the environment:
+
+```bash
+MAINTENANT_LICENSE_KEY=your-license-key
+```
+
+Learn more at [kolapsis.github.io/maintenant](https://kolapsis.github.io/maintenant/).
 
 ---
 
