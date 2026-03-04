@@ -18,7 +18,6 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY pkg/ ./pkg/
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=spa-builder /src/frontend/dist cmd/maintenant/web/dist/
