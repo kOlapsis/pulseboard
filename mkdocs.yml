@@ -77,6 +77,7 @@ nav:
       - Update Intelligence: features/updates.md
       - Alert Engine: features/alerts.md
       - Public Status Page: features/status-page.md
+      - MCP Server: features/mcp.md
   - Guides:
       - Docker Labels Reference: guides/docker-labels.md
       - Kubernetes Guide: guides/kubernetes.md

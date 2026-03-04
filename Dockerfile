@@ -7,14 +7,18 @@ RUN npm ci --ignore-scripts
 COPY frontend/ ./
 RUN npm run build-only
 
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.6.1 AS xx
 
-RUN apk add --no-cache gcc musl-dev
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+
+COPY --from=xx / /
+RUN apk add --no-cache clang lld
 
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
+COPY pkg/ ./pkg/
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=spa-builder /src/frontend/dist cmd/maintenant/web/dist/
@@ -23,10 +27,11 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
 ARG LICENSE_PUBLIC_KEY
-ARG TARGETOS TARGETARCH
+ARG TARGETPLATFORM
 
-RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build \
+RUN xx-apk add --no-cache gcc musl-dev
+RUN xx-go --wrap
+RUN CGO_ENABLED=1 go build \
     -ldflags="-s -w \
       -X main.version=${VERSION} \
       -X main.commit=${COMMIT} \
@@ -34,6 +39,7 @@ RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
       -X main.publicKeyB64=${LICENSE_PUBLIC_KEY}" \
     -o /out/maintenant \
     ./cmd/maintenant
+RUN xx-verify /out/maintenant
 
 FROM alpine:3.21
 
