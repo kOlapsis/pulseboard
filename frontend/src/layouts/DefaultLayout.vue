@@ -5,7 +5,7 @@ LICENSE-COMMERCIAL.md Source: https://github.com/kolapsis/maintenant -->
 
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import { useAppVersion } from '@/composables/useAppVersion'
 import { useEdition } from '@/composables/useEdition'
@@ -94,31 +94,32 @@ const mainNav = [
 
         <!-- Bottom section: Edition -->
         <div class="p-4 border-t border-slate-800 space-y-3 shrink-0">
-          <div class="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40">
-            <div class="flex justify-between items-center" :class="{ 'mb-2.5': !isEnterprise }">
-              <span
-                class="text-[10px] font-bold uppercase tracking-tighter"
-                :class="isEnterprise ? 'text-emerald-400' : 'text-slate-400'"
-                >{{ isEnterprise ? 'Pro Edition' : 'Community Edition' }}</span
+          <router-link :to="{ name: 'pro-edition' }">
+            <div class="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40">
+              <div class="flex justify-between items-center" :class="{ 'mb-2.5': !isEnterprise }">
+                <span
+                  class="text-[10px] font-bold uppercase tracking-tighter"
+                  :class="isEnterprise ? 'text-emerald-400' : 'text-slate-400'"
+                  >{{ isEnterprise ? 'Pro Edition' : 'Community Edition' }}</span
+                >
+                <span
+                  class="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                  :class="
+                    isEnterprise
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-pb-green-500/20 text-pb-green-400 border border-pb-green-500/30'
+                  "
+                  >{{ version }}</span
+                >
+              </div>
+              <button
+                v-if="!isEnterprise"
+                class="block w-full py-1.5 bg-slate-700/50 text-slate-300 hover:text-slate-200 rounded-lg text-xs font-semibold text-center transition-colors"
               >
-              <span
-                class="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                :class="
-                  isEnterprise
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-pb-green-500/20 text-pb-green-400 border border-pb-green-500/30'
-                "
-                >{{ version }}</span
-              >
+                Pro Edition
+              </button>
             </div>
-            <router-link
-              v-if="!isEnterprise"
-              :to="{ name: 'pro-edition' }"
-              class="block w-full py-1.5 bg-slate-700/50 text-slate-300 hover:text-slate-200 rounded-lg text-xs font-semibold text-center transition-colors"
-            >
-              Pro Edition
-            </router-link>
-          </div>
+          </router-link>
         </div>
       </div>
     </aside>
