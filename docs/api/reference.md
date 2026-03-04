@@ -32,6 +32,7 @@ All endpoints are under `/api/v1/`. Responses are JSON. Errors follow a standard
 | `GET` | `/api/v1/containers/{id}/transitions` | List state transitions |
 | `GET` | `/api/v1/containers/{id}/logs` | Fetch recent logs |
 | `GET` | `/api/v1/containers/{id}/logs/stream` | Stream logs in real time (SSE) |
+| `DELETE` | `/api/v1/containers/{id}` | Remove a container from monitoring |
 | `GET` | `/api/v1/containers/{id}/endpoints` | List endpoints for a container |
 
 ---
@@ -89,14 +90,14 @@ These routes do not require authentication:
 
 ## Resources
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/containers/{id}/resources/current` | Current CPU, memory, network, I/O |
-| `GET` | `/api/v1/containers/{id}/resources/history` | Historical metrics (`?range=24h`) |
-| `GET` | `/api/v1/containers/{id}/resources/alerts` | Get alert thresholds |
-| `PUT` | `/api/v1/containers/{id}/resources/alerts` | Set alert thresholds |
-| `GET` | `/api/v1/resources/summary` | Aggregate resource summary |
-| `GET` | `/api/v1/resources/top` | Top consumers (`?sort=cpu&limit=10`) |
+| Method | Endpoint | Description | Edition |
+|--------|----------|-------------|:-------:|
+| `GET` | `/api/v1/containers/{id}/resources/current` | Current CPU, memory, network, I/O | |
+| `GET` | `/api/v1/containers/{id}/resources/history` | Historical metrics (`?range=24h`) | Pro |
+| `GET` | `/api/v1/containers/{id}/resources/alerts` | Get alert thresholds | |
+| `PUT` | `/api/v1/containers/{id}/resources/alerts` | Set alert thresholds | |
+| `GET` | `/api/v1/resources/summary` | Aggregate resource summary | |
+| `GET` | `/api/v1/resources/top` | Top consumers (`?sort=cpu&limit=10`) | |
 
 ---
 
@@ -147,6 +148,8 @@ These routes do not require authentication:
 
 ## Status Page (Admin)
 
+### Groups & Components
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/v1/status/groups` | List component groups |
@@ -157,6 +160,39 @@ These routes do not require authentication:
 | `POST` | `/api/v1/status/components` | Create a component |
 | `PUT` | `/api/v1/status/components/{id}` | Update a component |
 | `DELETE` | `/api/v1/status/components/{id}` | Delete a component |
+
+### Incidents (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/status/incidents` | List all incidents |
+| `POST` | `/api/v1/status/incidents` | Create an incident |
+| `PUT` | `/api/v1/status/incidents/{id}` | Update an incident |
+| `DELETE` | `/api/v1/status/incidents/{id}` | Delete an incident |
+| `POST` | `/api/v1/status/incidents/{id}/updates` | Add an incident update |
+
+### Maintenance Windows (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/status/maintenance` | List maintenance windows |
+| `POST` | `/api/v1/status/maintenance` | Schedule a maintenance window |
+| `PUT` | `/api/v1/status/maintenance/{id}` | Update a maintenance window |
+| `DELETE` | `/api/v1/status/maintenance/{id}` | Delete a maintenance window |
+
+### Subscribers (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/status/subscribers` | List email subscribers |
+
+### SMTP Configuration (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/status/smtp` | Get SMTP configuration |
+| `PUT` | `/api/v1/status/smtp` | Update SMTP configuration |
+| `POST` | `/api/v1/status/smtp/test` | Send a test email |
 
 ---
 
@@ -175,6 +211,33 @@ These routes do not require authentication:
 | `GET` | `/api/v1/updates/exclusions` | List exclusions |
 | `POST` | `/api/v1/updates/exclusions` | Create an exclusion |
 | `DELETE` | `/api/v1/updates/exclusions/{id}` | Delete an exclusion |
+
+---
+
+## CVE Intelligence (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/cve` | List known CVEs across all containers |
+| `GET` | `/api/v1/cve/{container_id}` | List CVEs for a specific container |
+
+---
+
+## Risk Scoring (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/risk` | Risk scores for all containers |
+| `GET` | `/api/v1/risk/{container_id}` | Risk score for a specific container |
+| `GET` | `/api/v1/risk/{container_id}/history` | Risk score history |
+
+---
+
+## License
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/license/status` | Current license status and edition info |
 
 ---
 

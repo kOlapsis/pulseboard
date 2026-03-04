@@ -41,7 +41,7 @@ coverage/
 site/
 
 # Build output
-maintenant
+/maintenant
 CLAUDE.md
 .claude/
 maintenant-*.md

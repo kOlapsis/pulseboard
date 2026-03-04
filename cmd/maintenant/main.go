@@ -193,7 +193,7 @@ func main() {
 
 	// --- Heartbeat monitoring ---
 	hbSvc := heartbeat.NewService(hbStore, logger, nil)
-	hbSvc.SetBaseURL(envOrDefault("MAINTENANT_BASE_URL", "http://localhost:"+addr[1:]))
+	hbSvc.SetBaseURL(envOrDefault("MAINTENANT_BASE_URL", "http://"+addr))
 	hbSvc.StartDeadlineChecker(ctx)
 
 	// --- SMTP configuration ---

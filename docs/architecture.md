@@ -88,26 +88,26 @@
 ```
 cmd/maintenant/            Entry point, service wiring
   web/                     Embedded frontend (embed.FS)
-pkg/                       Public packages (importable by Pro)
-    app/                   AppBuilder, composable application assembly
-    alert/                 Types, interfaces, CE formatters (webhook, discord)
-    pro/                   Extension point interfaces + no-ops
 internal/                  Private packages
+    alert/                 Alert engine, notifier, formatters (webhook, discord)
     api/v1/                HTTP handlers, SSE broker, router
-    alertengine/           Alert engine, notifier
+    certificate/           TLS certificate monitoring
     container/             Container model, service, uptime
     docker/                Docker runtime implementation
-    kubernetes/            Kubernetes runtime implementation
-    runtime/               Runtime abstraction interface
     endpoint/              Endpoint monitoring (HTTP/TCP)
+    event/                 Event types and dispatching
+    extension/             Extension point interfaces + no-ops (used by Pro)
     heartbeat/             Heartbeat/cron monitoring
-    certificate/           TLS certificate monitoring
-    resource/              Resource metrics collection
-    update/                Update intelligence, registry
-    status/                Public status page (handler, templates)
+    kubernetes/            Kubernetes runtime implementation
+    license/               License validation and management
     mcp/                   MCP server (Model Context Protocol)
-    webhook/               Webhook dispatcher
+    ratelimit/             Per-IP rate limiting middleware
+    resource/              Resource metrics collection
+    runtime/               Runtime abstraction interface
+    status/                Public status page (handler, subscribers)
     store/sqlite/          SQLite store layer, migrations, writer
+    update/                Update intelligence, registry scanning
+    webhook/               Webhook dispatcher
 
 frontend/src/
   pages/                   Vue page components
@@ -162,7 +162,7 @@ maintenant uses SQLite in WAL (Write-Ahead Logging) mode with a single-writer pa
 - **One writer goroutine** — All writes are serialized through a channel-based writer to avoid `SQLITE_BUSY` errors
 - **Multiple readers** — Read queries run concurrently without blocking
 - **Automatic migrations** — Schema migrations run at startup using embedded SQL files
-- **Retention cleanup** — Background goroutine prunes old data (events: 30 days, alerts: 90 days, updates: 30 days)
+- **Retention cleanup** — Background goroutine prunes old data hourly (transitions: 90 days, check results: 30 days, heartbeat pings: 30 days, resource snapshots: 7 days, resource hourly: 90 days, resource daily: 1 year)
 
 ---
 

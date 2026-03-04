@@ -19,7 +19,14 @@ maintenant is configured entirely through environment variables. No configuratio
 | `MAINTENANT_K8S_EXCLUDE_NAMESPACES` | none | Kubernetes namespace blocklist (comma-separated). |
 | `MAINTENANT_LICENSE_KEY` | — | Pro license key. Enables Pro features when set to a valid key. |
 | `MAINTENANT_MCP` | `false` | Enable the MCP server on `/mcp` (Streamable HTTP transport). |
-| `MAINTENANT_MCP_ALLOWED_EMAIL` | — | Restrict MCP access to JWTs matching this email. |
+| `MAINTENANT_MCP_CLIENT_ID` | — | OAuth2 client ID for MCP authentication. |
+| `MAINTENANT_MCP_CLIENT_SECRET` | — | OAuth2 client secret for MCP authentication. |
+| `MAINTENANT_ORGANISATION_NAME` | `Maintenant` | Organisation name displayed on the public status page. |
+| `MAINTENANT_SMTP_HOST` | — | SMTP server hostname for email notifications. |
+| `MAINTENANT_SMTP_PORT` | `587` | SMTP server port. |
+| `MAINTENANT_SMTP_USERNAME` | — | SMTP authentication username. |
+| `MAINTENANT_SMTP_PASSWORD` | — | SMTP authentication password. |
+| `MAINTENANT_SMTP_FROM` | `maintenant@localhost` | Sender address for email notifications. |
 
 ### Example `.env` File
 
@@ -37,23 +44,34 @@ MAINTENANT_BASE_URL=https://maintenant.example.com
 # MAINTENANT_CORS_ORIGINS=http://localhost:5173
 
 # Container runtime override (auto-detected by default: docker or kubernetes)
-# maintenant_RUNTIME=docker
+# MAINTENANT_RUNTIME=docker
 
 # Max request body size in bytes (default: 1MB)
-# maintenant_MAX_BODY_SIZE=1048576
+# MAINTENANT_MAX_BODY_SIZE=1048576
 
 # Update intelligence scan interval (Go duration, default: 24h)
-# maintenant_UPDATE_INTERVAL=24h
+# MAINTENANT_UPDATE_INTERVAL=24h
 
 # Kubernetes namespaces to monitor (comma-separated, empty = all)
-# maintenant_K8S_NAMESPACES=default,production
+# MAINTENANT_K8S_NAMESPACES=default,production
 
 # Kubernetes namespaces to exclude (comma-separated)
-# maintenant_K8S_EXCLUDE_NAMESPACES=kube-system
+# MAINTENANT_K8S_EXCLUDE_NAMESPACES=kube-system
+
+# Organisation name (displayed on the public status page)
+# MAINTENANT_ORGANISATION_NAME=Acme Corp
 
 # MCP Server (Model Context Protocol for AI assistants)
 # MAINTENANT_MCP=true
-# MAINTENANT_MCP_ALLOWED_EMAIL=you@example.com
+# MAINTENANT_MCP_CLIENT_ID=maintenant-mcp
+# MAINTENANT_MCP_CLIENT_SECRET=your-secret-here
+
+# SMTP configuration (required for email notification channels)
+# MAINTENANT_SMTP_HOST=smtp.example.com
+# MAINTENANT_SMTP_PORT=587
+# MAINTENANT_SMTP_USERNAME=alerts@example.com
+# MAINTENANT_SMTP_PASSWORD=secret
+# MAINTENANT_SMTP_FROM=maintenant@example.com
 ```
 
 ---
@@ -80,66 +98,19 @@ GET /api/v1/license/status
 
 ---
 
-## Security Model
+## Security
 
-maintenant does not include built-in authentication — by design.
-
-Like Dozzle, Prometheus, and most self-hosted monitoring tools, maintenant is designed to sit behind your existing reverse proxy and auth middleware. No need to manage yet another set of user accounts.
+maintenant does not include built-in authentication — by design. It delegates auth to your reverse proxy and middleware (Authelia, Authentik, OAuth2 Proxy).
 
 ```
-Internet  ->  Reverse Proxy (Traefik / Caddy / nginx)
-          ->  Auth (Authelia / Authentik / OAuth2 Proxy)
-          ->  maintenant
+Internet  →  Reverse Proxy (Traefik / Caddy / nginx)
+          →  Auth Provider
+          →  maintenant
 ```
 
-### Example: Traefik + Authelia
+The `/api/v1/*` routes and the dashboard must be behind authentication. The `/ping/` and `/status/` routes must be publicly accessible. If MCP is enabled with OAuth2, the `/mcp`, `/oauth/`, and `/.well-known/` routes should bypass proxy auth (MCP handles its own).
 
-```yaml
-services:
-  maintenant:
-    image: ghcr.io/kolapsis/maintenant:latest
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.maintenant.rule: "Host(`now.example.com`)"
-      traefik.http.routers.maintenant.middlewares: "authelia@docker"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - maintenant-data:/data
-    environment:
-      maintenant_DB: "/data/maintenant.db"
-      maintenant_BASE_URL: "https://now.example.com"
-```
-
----
-
-## Public Routes
-
-Two route prefixes are designed to be publicly accessible and should bypass your authentication middleware:
-
-| Route | Purpose |
-|-------|---------|
-| `/ping/{uuid}` | Heartbeat ping endpoint. Called by cron jobs and external services. |
-| `/status/` | Public status page. Visible to your end users. |
-
-!!! warning "Proxy configuration"
-    Make sure your reverse proxy rules allow unauthenticated access to `/ping/` and `/status/` paths.
-    If MCP is enabled, `/mcp` requires long-lived connections (SSE) — disable response buffering and timeouts for this path.
-    All other routes (especially `/api/v1/`) should require authentication.
-
-### Traefik Example: Bypassing Auth for Public Routes
-
-```yaml
-labels:
-  # Main router with auth
-  traefik.http.routers.maintenant.rule: "Host(`now.example.com`)"
-  traefik.http.routers.maintenant.middlewares: "authelia@docker"
-
-  # Public routes without auth
-  traefik.http.routers.maintenant-public.rule: >
-    Host(`now.example.com`) &&
-    (PathPrefix(`/ping/`) || PathPrefix(`/status/`))
-  traefik.http.routers.maintenant-public.priority: "100"
-```
+See the **[Security Guide](../security.md)** for the complete route reference, reverse proxy examples (Traefik, Caddy, nginx), built-in protections, MCP authentication details, and deployment hardening checklist.
 
 ---
 
@@ -157,5 +128,5 @@ maintenant uses SQLite in WAL (Write-Ahead Logging) mode with a single-writer pa
     volumes:
       - maintenant-data:/data
     environment:
-      maintenant_DB: "/data/maintenant.db"
+      MAINTENANT_DB: "/data/maintenant.db"
     ```

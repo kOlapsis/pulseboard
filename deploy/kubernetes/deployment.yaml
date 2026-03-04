@@ -33,7 +33,7 @@ spec:
           env:
             - name: MAINTENANT_RUNTIME
               value: "kubernetes"
-            - name: MAINTENANT_DB_PATH
+            - name: MAINTENANT_DB
               value: "/data/maintenant.db"
           securityContext:
             allowPrivilegeEscalation: false

@@ -93,11 +93,10 @@ Add certificate monitoring to a container using labels:
 
 ```yaml
 labels:
-  maintenant.certificate.domain: "api.example.com"
-  maintenant.certificate.port: "443"
+  maintenant.tls.certificates: "api.example.com,dashboard.example.com:8443"
 ```
 
-See the [Docker Labels Reference](../guides/docker-labels.md) for the full list of certificate-related labels.
+Domains are comma-separated. Port defaults to `443` if omitted. See the [Docker Labels Reference](../guides/docker-labels.md) for details.
 
 ---
 

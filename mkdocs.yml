@@ -83,4 +83,5 @@ nav:
       - Kubernetes Guide: guides/kubernetes.md
   - API:
       - API Reference: api/reference.md
+  - Security: security.md
   - Architecture: architecture.md

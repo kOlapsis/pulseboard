@@ -114,7 +114,7 @@ Automatic detection from your HTTPS endpoints, plus standalone monitors for any 
 
 ### Resource Metrics
 
-Real-time CPU, memory, network I/O, and disk I/O per container. Historical charts from 1 hour to 7 days. Per-container alert thresholds with debounce to avoid noise. Top consumers view for instant triage.
+Real-time CPU, memory, network I/O, and disk I/O per container. Historical charts from 1 hour to 30 days (Pro). Per-container alert thresholds with debounce to avoid noise. Top consumers view for instant triage.
 
 ### Update Intelligence
 
@@ -143,7 +143,11 @@ Built-in [Model Context Protocol](https://modelcontextprotocol.io/) server. Quer
 | `MAINTENANT_ADDR`                   | `127.0.0.1:8080`        | HTTP bind address                               |
 | `MAINTENANT_DB`                     | `./maintenant.db`       | SQLite database path                            |
 | `MAINTENANT_BASE_URL`               | `http://localhost:8080` | Base URL (used for heartbeat ping URLs)         |
+| `MAINTENANT_ORGANISATION_NAME`      | `Maintenant`            | Organisation name on the status page            |
+| `MAINTENANT_CORS_ORIGINS`           | same-origin             | CORS allowed origins (comma-separated)          |
 | `MAINTENANT_RUNTIME`                | auto-detect             | Force `docker` or `kubernetes`                  |
+| `MAINTENANT_MAX_BODY_SIZE`          | `1048576`               | Max request body size in bytes (1 MB)           |
+| `MAINTENANT_UPDATE_INTERVAL`        | `24h`                   | Update intelligence scan interval               |
 | `MAINTENANT_LICENSE_KEY`            | —                       | Pro license key (enables Pro features)          |
 | `MAINTENANT_MCP`                    | `false`                 | Enable MCP server (Streamable HTTP on `/mcp`)   |
 | `MAINTENANT_MCP_CLIENT_ID`          | —                       | OAuth2 client ID for MCP authentication         |
@@ -410,8 +414,6 @@ Contributions are welcome! Please open an issue first to discuss what you'd like
 
 ## License
 
-Copyright 2025 - Benjamin Touchard / kOlapsis - Bordeaux, France
+Copyright 2025-2026 Benjamin Touchard / kOlapsis — Bordeaux, France
 
-Licensed under the [Business Source License 1.1](LICENSE) (BSL 1.1).
-
-**You can use maintenant freely** for personal use, internal business use, and non-commercial purposes. The only restriction is offering maintenant as a competing hosted service.
+Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0) or a commercial license.
