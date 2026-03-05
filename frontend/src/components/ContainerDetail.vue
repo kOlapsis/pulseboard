@@ -24,6 +24,7 @@ import { useResourcesStore } from '@/stores/resources'
 import { timeAgo } from '@/utils/time'
 import LogViewer from './LogViewer.vue'
 import ContainerEventTimeline from './ContainerEventTimeline.vue'
+import { getStateStyle, getExitCodeStyle } from '@/utils/containerState'
 import {
   X,
   Trash2,
@@ -60,14 +61,10 @@ const hasMultipleContainers = computed(() => {
   return names.filter(n => !n.endsWith(' (init)')).length > 1
 })
 
-const stateConfig: Record<string, { color: string; bg: string; glow?: string }> = {
-  running: { color: 'var(--pb-status-ok)', bg: 'var(--pb-status-ok-bg)', glow: 'var(--pb-glow-ok)' },
-  exited: { color: 'var(--pb-text-muted)', bg: 'var(--pb-bg-elevated)' },
-  completed: { color: 'var(--pb-text-secondary)', bg: 'var(--pb-bg-elevated)' },
-  restarting: { color: 'var(--pb-status-warn)', bg: 'var(--pb-status-warn-bg)', glow: 'var(--pb-glow-warn)' },
-  paused: { color: 'var(--pb-accent)', bg: 'var(--pb-bg-elevated)' },
-  created: { color: 'var(--pb-text-muted)', bg: 'var(--pb-bg-elevated)' },
-  dead: { color: 'var(--pb-status-down)', bg: 'var(--pb-status-down-bg)' },
+const stateConfig = {
+  get(state: string) {
+    return getStateStyle(state)
+  },
 }
 
 const metrics = computed(() => {
@@ -176,8 +173,8 @@ watch(() => props.containerId, () => {
         <div
           class="h-3 w-3 shrink-0 rounded-full"
           :style="{
-            backgroundColor: (stateConfig[container.state] || stateConfig.created).color,
-            boxShadow: (stateConfig[container.state] || stateConfig.created).glow || 'none',
+            backgroundColor: stateConfig.get(container.state).color,
+            boxShadow: stateConfig.get(container.state).glow || 'none',
           }"
         />
         <!-- Name + image -->
@@ -193,8 +190,8 @@ watch(() => props.containerId, () => {
         <span
           class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
           :style="{
-            backgroundColor: (stateConfig[container.state] || stateConfig.created).bg,
-            color: (stateConfig[container.state] || stateConfig.created).color,
+            backgroundColor: stateConfig.get(container.state).bg,
+            color: stateConfig.get(container.state).color,
           }"
         >
           {{ container.state }}
@@ -391,19 +388,18 @@ watch(() => props.containerId, () => {
                 <div class="flex items-center gap-1.5 min-w-0 flex-1">
                   <span
                     class="font-medium"
-                    :style="{ color: (stateConfig[t.previous_state] || stateConfig.created).color }"
+                    :style="{ color: stateConfig.get(t.previous_state).color }"
                   >{{ t.previous_state }}</span>
                   <ChevronRight :size="11" :style="{ color: 'var(--pb-text-muted)' }" />
                   <span
                     class="font-medium"
-                    :style="{ color: (stateConfig[t.new_state] || stateConfig.created).color }"
+                    :style="{ color: stateConfig.get(t.new_state).color }"
                   >{{ t.new_state }}</span>
                   <span
                     v-if="t.exit_code !== undefined && t.exit_code !== null"
                     class="ml-1 rounded px-1.5 py-0.5"
                     :style="{
-                      backgroundColor: 'var(--pb-status-down-bg)',
-                      color: 'var(--pb-status-down)',
+                      ...getExitCodeStyle(t.exit_code),
                       fontSize: '0.65rem',
                     }"
                   >exit {{ t.exit_code }}</span>

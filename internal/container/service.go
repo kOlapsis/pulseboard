@@ -105,9 +105,7 @@ func (s *Service) ProcessEvent(ctx context.Context, evt ContainerEvent) {
 		}
 		s.handleStateChange(ctx, evt, StateExited)
 	case "die":
-		// Exit code 0 means the container terminated normally (e.g. migration, init container).
-		// Use StateCompleted so it is not treated as an error in monitoring.
-		if evt.ExitCode != "" && parseExitCode(evt.ExitCode) == 0 {
+		if evt.ExitCode != "" && isGracefulExitCode(parseExitCode(evt.ExitCode)) {
 			s.handleStateChange(ctx, evt, StateCompleted)
 		} else {
 			s.handleStateChange(ctx, evt, StateExited)
@@ -446,4 +444,13 @@ func parseExitCode(s string) int {
 	var ec int
 	fmt.Sscanf(s, "%d", &ec)
 	return ec
+}
+
+// isGracefulExitCode returns true for exit codes that indicate a voluntary/normal
+// termination rather than a crash:
+//   - 0: normal exit
+//   - 137: SIGKILL (128+9) — sent by docker stop after SIGTERM timeout
+//   - 143: SIGTERM (128+15) — graceful shutdown signal
+func isGracefulExitCode(code int) bool {
+	return code == 0 || code == 137 || code == 143
 }

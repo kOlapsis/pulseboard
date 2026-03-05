@@ -111,8 +111,9 @@ func (c *Client) inspectAndMap(ctx context.Context, dc types.Container, now time
 		cm.HealthStatus = &hs
 	}
 
-	// Reclassify exited-with-code-0 containers as "completed" (normal termination).
-	if info.State != nil && info.State.Status == "exited" && info.State.ExitCode == 0 {
+	// Reclassify gracefully-stopped containers as "completed" (normal termination).
+	// Exit 0 = normal exit, 137 = SIGKILL (docker stop), 143 = SIGTERM.
+	if info.State != nil && info.State.Status == "exited" && isGracefulExitCode(info.State.ExitCode) {
 		cm.State = cmodel.StateCompleted
 	}
 
@@ -188,6 +189,12 @@ func mapContainerState(state string) cmodel.ContainerState {
 	default:
 		return cmodel.StateCreated
 	}
+}
+
+// isGracefulExitCode returns true for exit codes that indicate a voluntary stop:
+// 0 = normal, 137 = SIGKILL (docker stop), 143 = SIGTERM.
+func isGracefulExitCode(code int) bool {
+	return code == 0 || code == 137 || code == 143
 }
 
 func mapHealthStatus(status string) cmodel.HealthStatus {

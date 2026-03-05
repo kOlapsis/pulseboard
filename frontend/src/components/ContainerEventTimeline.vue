@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { StateTransition } from '@/services/containerApi'
+import { getStateColor } from '@/utils/containerState'
 
 const props = withDefaults(defineProps<{
   transitions: StateTransition[]
@@ -37,12 +38,7 @@ const timeWindow = computed(() => {
 })
 
 function stateColor(state: string): string {
-  if (state === 'running') return 'var(--pb-status-ok)'
-  if (state === 'exited' || state === 'dead') return 'var(--pb-status-down)'
-  if (state === 'restarting') return 'var(--pb-status-warn)'
-  if (state === 'paused') return 'var(--pb-status-paused)'
-  if (state === 'created') return 'var(--pb-text-muted)'
-  return 'var(--pb-text-muted)'
+  return getStateColor(state)
 }
 
 function stateOpacity(state: string): string {

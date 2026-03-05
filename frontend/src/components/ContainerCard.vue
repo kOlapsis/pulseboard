@@ -16,6 +16,7 @@ import type {Container} from '@/services/containerApi'
 import {useResourcesStore} from '@/stores/resources'
 import {useUpdatesStore} from '@/stores/updates'
 import {timeAgo} from '@/utils/time'
+import {getStateStyle as getStateStyleFromUtil} from '@/utils/containerState'
 import UpdateBadge from '@/components/UpdateBadge.vue'
 import {computed} from 'vue'
 
@@ -32,16 +33,6 @@ const updatesStore = useUpdatesStore()
 
 const metrics = computed(() => resourcesStore.formattedSnapshot(props.container.id))
 const containerUpdate = computed(() => updatesStore.updates.find(u => u.container_id === props.container.external_id) ?? null)
-
-const stateColors: Record<string, { bg: string; text: string }> = {
-  running: { bg: 'var(--pb-status-ok-bg)', text: 'var(--pb-status-ok)' },
-  exited: { bg: 'var(--pb-status-down-bg)', text: 'var(--pb-status-down)' },
-  completed: { bg: 'var(--pb-bg-elevated)', text: 'var(--pb-text-secondary)' },
-  restarting: { bg: 'var(--pb-status-warn-bg)', text: 'var(--pb-status-warn)' },
-  paused: { bg: 'var(--pb-bg-elevated)', text: 'var(--pb-accent)' },
-  created: { bg: 'var(--pb-bg-elevated)', text: 'var(--pb-text-muted)' },
-  dead: { bg: 'var(--pb-status-down-bg)', text: 'var(--pb-status-down)' },
-}
 
 const healthColors: Record<string, string> = {
   healthy: 'var(--pb-status-ok)',
@@ -70,10 +61,10 @@ function barColor(value: number): string {
 const formatTime = timeAgo
 
 function getStateStyle(state: string) {
-  const colors = stateColors[state] || { bg: 'var(--pb-bg-elevated)', text: 'var(--pb-text-muted)' }
+  const s = getStateStyleFromUtil(state)
   return {
-    backgroundColor: colors.bg,
-    color: colors.text,
+    backgroundColor: s.bg,
+    color: s.color,
   }
 }
 </script>
