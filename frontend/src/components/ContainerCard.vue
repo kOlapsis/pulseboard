@@ -80,13 +80,13 @@ function getStateStyle(state: string) {
       transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
       cursor: 'pointer',
     }"
-    class="hover:shadow-pb-elevated hover:border-slate-600"
+    class="overflow-hidden hover:shadow-pb-elevated hover:border-slate-600"
     @click="emit('select', container)"
   >
     <div class="flex items-start justify-between">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <h3 class="truncate text-sm font-semibold" :style="{ color: 'var(--pb-text-primary)' }">
+        <div class="flex min-w-0 items-center gap-2">
+          <h3 class="min-w-0 truncate text-sm font-semibold" :style="{ color: 'var(--pb-text-primary)' }">
             {{ container.name }}
           </h3>
           <span
