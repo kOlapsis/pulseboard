@@ -35,8 +35,9 @@ type Collector struct {
 	logger       *slog.Logger
 	onSnapshot   func(snap *ResourceSnapshot)
 
-	mu     sync.Mutex
-	latest map[int64]*ResourceSnapshot // keyed by container_id
+	mu       sync.Mutex
+	latest   map[int64]*ResourceSnapshot // keyed by container_id
+	hostStat *HostStatReader
 }
 
 // NewCollector creates a resource stats collector.
@@ -47,6 +48,7 @@ func NewCollector(rt pbruntime.Runtime, containerSvc *container.Service, logger 
 		interval:     defaultCollectInterval,
 		logger:       logger,
 		latest:       make(map[int64]*ResourceSnapshot),
+		hostStat:     NewHostStatReader(),
 	}
 }
 
@@ -80,10 +82,13 @@ func (c *Collector) GetAllLatest() map[int64]*ResourceSnapshot {
 
 // Start begins the collection ticker. Blocks until ctx is cancelled.
 func (c *Collector) Start(ctx context.Context) {
+	// Host stats run in their own goroutine at 1s intervals (like htop).
+	go c.hostStat.Start(ctx)
+
 	ticker := time.NewTicker(c.interval)
 	defer ticker.Stop()
 
-	// Collect once immediately on start.
+	// Collect container stats once immediately on start.
 	c.collect(ctx)
 
 	for {
@@ -94,6 +99,11 @@ func (c *Collector) Start(ctx context.Context) {
 			c.collect(ctx)
 		}
 	}
+}
+
+// GetHostStat returns the host stat reader for CPU and memory.
+func (c *Collector) GetHostStat() *HostStatReader {
+	return c.hostStat
 }
 
 func (c *Collector) collect(ctx context.Context) {

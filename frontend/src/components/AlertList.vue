@@ -101,9 +101,45 @@ const selectStyle = 'background: var(--pb-bg-elevated); border-color: var(--pb-b
       </select>
     </div>
 
-    <!-- Alert table -->
+    <!-- Mobile card list -->
+    <div class="md:hidden space-y-2">
+      <div v-if="store.alerts.length === 0 && !store.loading" class="rounded-lg border p-8 text-center text-sm" style="background: var(--pb-bg-surface); border-color: var(--pb-border-default); color: var(--pb-text-muted)">No alerts found</div>
+      <div
+        v-for="alert in store.alerts"
+        :key="'m-' + alert.id"
+        class="rounded-lg border p-3"
+        style="background: var(--pb-bg-surface); border-color: var(--pb-border-default)"
+      >
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <div class="flex items-center gap-2">
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-medium"
+              :style="{
+                background: (severityColors[alert.severity] || { bg: 'var(--pb-bg-elevated)' }).bg,
+                color: (severityColors[alert.severity] || { color: 'var(--pb-text-secondary)' }).color,
+              }"
+            >{{ alert.severity }}</span>
+            <span class="rounded px-1.5 py-0.5 text-xs font-medium" style="background: var(--pb-bg-elevated); color: var(--pb-text-secondary)">{{ alert.source }}</span>
+          </div>
+          <span
+            class="rounded-full px-2 py-0.5 text-xs font-medium"
+            :style="{
+              background: (statusColors[alert.status] || { bg: 'var(--pb-bg-elevated)' }).bg,
+              color: (statusColors[alert.status] || { color: 'var(--pb-text-secondary)' }).color,
+            }"
+          >{{ alert.status }}</span>
+        </div>
+        <p class="text-sm truncate" style="color: var(--pb-text-primary)">{{ alert.message }}</p>
+        <div class="flex items-center justify-between mt-1.5 text-xs" style="color: var(--pb-text-muted)">
+          <span>{{ alert.entity_name || '-' }}</span>
+          <span>{{ formatTime(alert.fired_at) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop table -->
     <div
-      class="overflow-hidden rounded-lg border"
+      class="hidden md:block overflow-x-auto rounded-lg border"
       style="background: var(--pb-bg-surface); border-color: var(--pb-border-default)"
     >
       <table class="min-w-full">

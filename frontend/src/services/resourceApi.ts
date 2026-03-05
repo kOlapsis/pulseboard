@@ -27,6 +27,7 @@ export interface ResourceSnapshot {
 
 export interface ResourceSummary {
   total_cpu_percent: number
+  cpu_count: number
   total_mem_used: number
   total_mem_limit: number
   total_mem_percent: number

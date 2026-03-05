@@ -14,6 +14,7 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -68,17 +69,18 @@ func (h *ResourceHandler) HandleGetCurrent(w http.ResponseWriter, r *http.Reques
 func (h *ResourceHandler) HandleGetSummary(w http.ResponseWriter, r *http.Request) {
 	all := h.service.GetAllLatestSnapshots()
 
-	var totalCPU float64
-	var totalMemUsed, totalMemLimit int64
 	var totalNetRxRate, totalNetTxRate int64
-
 	for _, snap := range all {
-		totalCPU += snap.CPUPercent
-		totalMemUsed += snap.MemUsed
-		totalMemLimit += snap.MemLimit
 		totalNetRxRate += snap.NetRxBytes
 		totalNetTxRate += snap.NetTxBytes
 	}
+
+	// Host CPU and memory from /proc/stat and /proc/meminfo (real host values).
+	hostStat := h.service.GetHostStat()
+	hostCPUPercent := hostStat.CPUPercent()
+	totalMemUsed := hostStat.MemUsed()
+	totalMemLimit := hostStat.MemTotal()
+	cpuCount := runtime.NumCPU()
 
 	totalMemPercent := 0.0
 	if totalMemLimit > 0 {
@@ -99,7 +101,8 @@ func (h *ResourceHandler) HandleGetSummary(w http.ResponseWriter, r *http.Reques
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"total_cpu_percent": totalCPU,
+		"total_cpu_percent": hostCPUPercent,
+		"cpu_count":         cpuCount,
 		"total_mem_used":    totalMemUsed,
 		"total_mem_limit":   totalMemLimit,
 		"total_mem_percent": totalMemPercent,

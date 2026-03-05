@@ -103,15 +103,12 @@ function navigateToSource(source: string) {
 }
 
 const totalCpu = computed(() => {
-  return Math.min(
-    Object.values(resources.snapshots).reduce((sum, s) => sum + s.cpu_percent, 0),
-    100,
-  )
+  return Math.min(resources.summary?.total_cpu_percent ?? 0, 100)
 })
 
 const memPercent = computed(() => {
-  const used = Object.values(resources.snapshots).reduce((sum, s) => sum + s.mem_used, 0)
-  const limit = Object.values(resources.snapshots).reduce((sum, s) => sum + s.mem_limit, 0)
+  const used = resources.summary?.total_mem_used ?? 0
+  const limit = resources.summary?.total_mem_limit ?? 0
   if (limit === 0) return 0
   return (used / limit) * 100
 })

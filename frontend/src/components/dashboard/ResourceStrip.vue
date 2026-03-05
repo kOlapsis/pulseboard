@@ -23,15 +23,15 @@ const containers = useContainersStore()
 const containerCount = computed(() => Object.keys(resources.snapshots).length)
 
 const totalCpu = computed(() =>
-  Object.values(resources.snapshots).reduce((sum, s) => sum + s.cpu_percent, 0),
+  resources.summary?.total_cpu_percent ?? 0,
 )
 
 const totalMemUsed = computed(() =>
-  Object.values(resources.snapshots).reduce((sum, s) => sum + s.mem_used, 0),
+  resources.summary?.total_mem_used ?? 0,
 )
 
 const totalMemLimit = computed(() =>
-  Object.values(resources.snapshots).reduce((sum, s) => sum + s.mem_limit, 0),
+  resources.summary?.total_mem_limit ?? 0,
 )
 
 const memPercent = computed(() => {

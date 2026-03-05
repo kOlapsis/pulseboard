@@ -34,8 +34,8 @@ const formatTime = timeAgo
 </script>
 
 <template>
-  <div class="bg-[#12151C] rounded-2xl border border-slate-800 p-5">
-    <div class="flex items-center justify-between mb-4">
+  <div class="bg-[#12151C] rounded-xl sm:rounded-2xl border border-slate-800 p-3 sm:p-5">
+    <div class="flex items-center justify-between mb-3 sm:mb-4">
       <div class="flex items-center gap-2.5">
         <ArrowUpCircle :size="15" class="text-pb-green-500" />
         <h3 class="text-sm font-bold text-white">Updates</h3>

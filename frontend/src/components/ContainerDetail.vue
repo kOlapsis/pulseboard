@@ -315,7 +315,7 @@ watch(() => props.containerId, () => {
         <!-- INFO TAB -->
         <div v-else class="space-y-5 p-5">
           <!-- Info grid -->
-          <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
               <span class="text-xs font-medium" :style="{ color: 'var(--pb-text-muted)' }">External ID</span>
               <p class="mt-0.5 font-mono text-xs" :style="{ color: 'var(--pb-text-primary)' }">

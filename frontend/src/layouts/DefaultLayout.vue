@@ -130,14 +130,14 @@ const mainNav = [
     >
       <button
         @click="mobileMenuOpen = !mobileMenuOpen"
-        class="p-1.5 rounded-md text-slate-400 hover:text-white transition-colors"
+        class="p-3 rounded-md text-slate-400 hover:text-white transition-colors"
         aria-label="Toggle navigation"
       >
         <Menu v-if="!mobileMenuOpen" :size="20" />
         <X v-else :size="20" />
       </button>
       <div class="ml-3 flex items-center gap-2">
-        <img src="/logo.svg" alt="maintenant" class="w-6 h-6 rounded-md" />
+        <img src="/icon.svg" alt="maintenant" class="w-6 h-6 rounded-md" />
         <span class="text-sm font-bold text-white">maintenant</span>
       </div>
       <div class="flex-1" />

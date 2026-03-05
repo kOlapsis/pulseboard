@@ -114,7 +114,7 @@ function statusStyle(mw: MaintenanceWindow): { bg: string; color: string } {
           <label class="block text-xs font-medium" style="color: var(--pb-text-secondary)">Description</label>
           <textarea v-model="form.description" rows="2" class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm outline-none" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)"></textarea>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium" style="color: var(--pb-text-secondary)">Start Time</label>
             <input v-model="form.starts_at" type="datetime-local" required class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)" />

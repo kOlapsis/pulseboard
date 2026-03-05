@@ -98,7 +98,7 @@ function onPasswordInput() {
     <div v-if="loading" class="text-sm" style="color: var(--pb-text-muted)">Loading...</div>
 
     <form v-else @submit.prevent="handleSave" class="max-w-lg space-y-3">
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium" style="color: var(--pb-text-secondary)">SMTP Host</label>
           <input v-model="form.host" class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm outline-none" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)" placeholder="smtp.example.com" />
@@ -108,7 +108,7 @@ function onPasswordInput() {
           <input v-model.number="form.port" type="number" class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm outline-none" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)" />
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium" style="color: var(--pb-text-secondary)">Username</label>
           <input v-model="form.username" class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm outline-none" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)" />
@@ -133,7 +133,7 @@ function onPasswordInput() {
           <option value="none">None</option>
         </select>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium" style="color: var(--pb-text-secondary)">From Address</label>
           <input v-model="form.from_address" type="email" class="mt-1 w-full rounded-md border px-3 py-1.5 text-sm outline-none" style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)" placeholder="status@example.com" />

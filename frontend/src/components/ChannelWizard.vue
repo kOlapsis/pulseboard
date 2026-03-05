@@ -178,7 +178,7 @@ function goBack() {
       <p class="mb-4 text-xs" style="color: var(--pb-text-muted)">Choose how you want to receive notifications</p>
 
       <!-- CE channels -->
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           v-for="type in ceChannelTypes"
           :key="type.key"
@@ -212,7 +212,7 @@ function goBack() {
       </div>
 
       <!-- Pro channels -->
-      <div class="mt-3 grid grid-cols-3 gap-3">
+      <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <FeatureGate
           v-for="type in proChannelTypes"
           :key="type.key"

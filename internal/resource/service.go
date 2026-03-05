@@ -70,6 +70,11 @@ func (s *Service) GetAllLatestSnapshots() map[int64]*ResourceSnapshot {
 	return s.collector.GetAllLatest()
 }
 
+// GetHostStat returns the host stat reader for CPU and memory.
+func (s *Service) GetHostStat() *HostStatReader {
+	return s.collector.GetHostStat()
+}
+
 // GetContainerName resolves a container ID to its name via the container service.
 func (s *Service) GetContainerName(containerID int64) string {
 	c, err := s.containerSvc.GetContainer(context.Background(), containerID)

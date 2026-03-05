@@ -27,11 +27,11 @@ const topConsumers = ref<TopConsumer[]>([])
 const loading = ref(false)
 
 const totalMemUsed = computed(() => {
-  return Object.values(store.snapshots).reduce((sum, s) => sum + s.mem_used, 0)
+  return store.summary?.total_mem_used ?? 0
 })
 
 const totalMemLimit = computed(() => {
-  return Object.values(store.snapshots).reduce((sum, s) => sum + s.mem_limit, 0)
+  return store.summary?.total_mem_limit ?? 0
 })
 
 const containerCount = computed(() => Object.keys(store.snapshots).length)
