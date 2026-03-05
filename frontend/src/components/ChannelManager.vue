@@ -34,7 +34,26 @@ const testResult = ref<{ id: number; status: string; response_code?: number; err
 
 // Routing rule form
 const showRuleForm = ref<number | null>(null)
-const ruleForm = ref({ source_filter: '', severity_filter: '' })
+const ruleForm = ref({ source_filter: '' as string, severity_filter: '' as string })
+const selectedSources = ref<string[]>([])
+const selectedSeverities = ref<string[]>([])
+
+const availableSources = ['container', 'endpoint', 'heartbeat', 'certificate', 'resource']
+const availableSeverities = ['critical', 'warning', 'info']
+
+function toggleSource(src: string) {
+  const idx = selectedSources.value.indexOf(src)
+  if (idx >= 0) selectedSources.value.splice(idx, 1)
+  else selectedSources.value.push(src)
+  ruleForm.value.source_filter = selectedSources.value.join(',')
+}
+
+function toggleSeverity(sev: string) {
+  const idx = selectedSeverities.value.indexOf(sev)
+  if (idx >= 0) selectedSeverities.value.splice(idx, 1)
+  else selectedSeverities.value.push(sev)
+  ruleForm.value.severity_filter = selectedSeverities.value.join(',')
+}
 
 function resetForm() {
   form.value = { name: '', url: '', headers: '', enabled: true }
@@ -74,6 +93,8 @@ async function handleTest(id: number) {
 async function handleAddRule(channelId: number) {
   await createRoutingRule(channelId, ruleForm.value)
   ruleForm.value = { source_filter: '', severity_filter: '' }
+  selectedSources.value = []
+  selectedSeverities.value = []
   showRuleForm.value = null
   store.fetchChannels()
 }
@@ -220,21 +241,47 @@ function handleWizardCreated(id: number) {
           >
             + Add routing rule
           </button>
-          <div v-else class="mt-1 flex gap-2">
-            <input
-              v-model="ruleForm.source_filter"
-              placeholder="Sources (e.g. endpoint,certificate)"
-              class="flex-1 rounded border px-2 py-1 text-xs outline-none"
-              style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)"
-            />
-            <input
-              v-model="ruleForm.severity_filter"
-              placeholder="Severities (e.g. critical)"
-              class="flex-1 rounded border px-2 py-1 text-xs outline-none"
-              style="background: var(--pb-bg-elevated); border-color: var(--pb-border-default); color: var(--pb-text-primary)"
-            />
-            <button @click="handleAddRule(ch.id)" class="rounded px-2 py-1 text-xs text-white" style="background: var(--pb-accent)">Add</button>
-            <button @click="showRuleForm = null" class="text-xs" style="color: var(--pb-text-muted)">Cancel</button>
+          <div v-else class="mt-1 space-y-2">
+            <div>
+              <p class="mb-1 text-xs font-medium" style="color: var(--pb-text-muted)">Sources <span style="color: var(--pb-text-secondary)">(empty = all)</span></p>
+              <div class="flex flex-wrap gap-1">
+                <button
+                  v-for="src in availableSources"
+                  :key="src"
+                  @click="toggleSource(src)"
+                  class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+                  :style="{
+                    background: selectedSources.includes(src) ? 'var(--pb-accent)' : 'var(--pb-bg-elevated)',
+                    borderColor: selectedSources.includes(src) ? 'var(--pb-accent)' : 'var(--pb-border-default)',
+                    color: selectedSources.includes(src) ? 'white' : 'var(--pb-text-secondary)',
+                  }"
+                >
+                  {{ src }}
+                </button>
+              </div>
+            </div>
+            <div>
+              <p class="mb-1 text-xs font-medium" style="color: var(--pb-text-muted)">Severities <span style="color: var(--pb-text-secondary)">(empty = all)</span></p>
+              <div class="flex flex-wrap gap-1">
+                <button
+                  v-for="sev in availableSeverities"
+                  :key="sev"
+                  @click="toggleSeverity(sev)"
+                  class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+                  :style="{
+                    background: selectedSeverities.includes(sev) ? 'var(--pb-accent)' : 'var(--pb-bg-elevated)',
+                    borderColor: selectedSeverities.includes(sev) ? 'var(--pb-accent)' : 'var(--pb-border-default)',
+                    color: selectedSeverities.includes(sev) ? 'white' : 'var(--pb-text-secondary)',
+                  }"
+                >
+                  {{ sev }}
+                </button>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button @click="handleAddRule(ch.id)" class="rounded px-2 py-1 text-xs text-white" style="background: var(--pb-accent)">Add</button>
+              <button @click="showRuleForm = null; selectedSources = []; selectedSeverities = []" class="text-xs" style="color: var(--pb-text-muted)">Cancel</button>
+            </div>
           </div>
         </div>
       </div>

@@ -61,9 +61,10 @@ const (
 
 // Alert engine events.
 const (
-	AlertFired    = "alert.fired"
-	AlertResolved = "alert.resolved"
-	AlertSilenced = "alert.silenced"
+	AlertFired        = "alert.fired"
+	AlertResolved     = "alert.resolved"
+	AlertSilenced     = "alert.silenced"
+	AlertAcknowledged = "alert.acknowledged"
 )
 
 // Notification channel management events.

@@ -54,23 +54,37 @@ type WebhookPayload struct {
 
 // Notifier dispatches webhook notifications with a bounded worker pool.
 type Notifier struct {
-	jobs         chan NotificationJob
-	channelStore ChannelStore
-	httpClient   *http.Client
-	smtpSender   *SMTPSender
-	logger       *slog.Logger
+	jobs           chan NotificationJob
+	channelStore   ChannelStore
+	httpClient     *http.Client
+	smtpSender     *SMTPSender
+	templateEngine TemplateEngine
+	logger         *slog.Logger
 }
 
 // NewNotifier creates a new webhook notifier.
 func NewNotifier(channelStore ChannelStore, logger *slog.Logger) *Notifier {
 	return &Notifier{
-		jobs:         make(chan NotificationJob, notifierChannelBuffer),
-		channelStore: channelStore,
+		jobs:           make(chan NotificationJob, notifierChannelBuffer),
+		channelStore:   channelStore,
+		templateEngine: noopTemplateEngine{},
 		httpClient: &http.Client{
 			Timeout: webhookTimeout,
 		},
 		logger: logger,
 	}
+}
+
+// SetTemplateEngine sets the template rendering extension.
+func (n *Notifier) SetTemplateEngine(t TemplateEngine) {
+	n.templateEngine = t
+}
+
+// noopTemplateEngine is the Notifier-internal no-op default.
+type noopTemplateEngine struct{}
+
+func (noopTemplateEngine) Render(_ context.Context, _ string, _ map[string]any) (string, error) {
+	return "", fmt.Errorf("no template engine configured")
 }
 
 // SetSMTPSender configures SMTP delivery for email channels.
@@ -129,12 +143,34 @@ func (n *Notifier) processJob(ctx context.Context, job NotificationJob) {
 		return
 	}
 
-	body, err := formatPayload(channelType, eventType, job.Alert)
-	if err != nil {
-		n.failDelivery(ctx, job.Delivery, fmt.Sprintf("marshal payload: %s", err))
-		return
+	// Consult template engine extension (Pro: custom templates per channel)
+	var body []byte
+	rendered, renderErr := n.templateEngine.Render(ctx, channelType, map[string]any{
+		"event":       eventType,
+		"alert_id":    job.Alert.ID,
+		"source":      job.Alert.Source,
+		"alert_type":  job.Alert.AlertType,
+		"severity":    job.Alert.Severity,
+		"status":      job.Alert.Status,
+		"message":     job.Alert.Message,
+		"entity_type": job.Alert.EntityType,
+		"entity_id":   job.Alert.EntityID,
+		"entity_name": job.Alert.EntityName,
+		"fired_at":    job.Alert.FiredAt,
+	})
+	if renderErr == nil {
+		body = []byte(rendered)
+	} else {
+		// Fall through to default formatter
+		var fmtErr error
+		body, fmtErr = formatPayload(channelType, eventType, job.Alert)
+		if fmtErr != nil {
+			n.failDelivery(ctx, job.Delivery, fmt.Sprintf("marshal payload: %s", fmtErr))
+			return
+		}
 	}
 
+	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			backoff := retryBackoffs[attempt-1]
@@ -146,8 +182,8 @@ func (n *Notifier) processJob(ctx context.Context, job NotificationJob) {
 		}
 
 		job.Delivery.Attempts = attempt + 1
-		err = n.sendWebhook(ctx, job.Channel, body)
-		if err == nil {
+		lastErr = n.sendWebhook(ctx, job.Channel, body)
+		if lastErr == nil {
 			job.Delivery.Status = DeliveryDelivered
 			if job.Delivery.ID != 0 {
 				if updateErr := n.channelStore.UpdateDelivery(ctx, job.Delivery); updateErr != nil {
@@ -164,11 +200,11 @@ func (n *Notifier) processJob(ctx context.Context, job NotificationJob) {
 
 		n.logger.Warn("notifier: webhook delivery attempt failed",
 			"attempt", attempt+1, "channel_id", job.Channel.ID,
-			"alert_id", job.Alert.ID, "error", err)
+			"alert_id", job.Alert.ID, "error", lastErr)
 	}
 
 	// All retries exhausted
-	n.failDelivery(ctx, job.Delivery, err.Error())
+	n.failDelivery(ctx, job.Delivery, lastErr.Error())
 }
 
 func (n *Notifier) processEmailJob(ctx context.Context, job NotificationJob, eventType string) {

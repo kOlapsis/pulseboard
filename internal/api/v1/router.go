@@ -238,6 +238,7 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		r.mux.HandleFunc("GET /api/v1/alerts", ah.HandleListAlerts)
 		r.mux.HandleFunc("GET /api/v1/alerts/active", ah.HandleGetActiveAlerts)
 		r.mux.HandleFunc("GET /api/v1/alerts/{id}", ah.HandleGetAlert)
+		r.mux.HandleFunc("POST /api/v1/alerts/{id}/acknowledge", ah.HandleAcknowledgeAlert)
 		// Notification channels
 		r.mux.HandleFunc("GET /api/v1/channels", ah.HandleListChannels)
 		r.mux.HandleFunc("POST /api/v1/channels", ah.HandleCreateChannel)
@@ -508,7 +509,8 @@ func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 				"teams":               isEnterprise,
 				"resource_history":    isEnterprise,
 				"alert_escalation":    isEnterprise,
-				"alert_routing":       isEnterprise,
+				"alert_routing":       true,
+				"alert_entity_routing": isEnterprise,
 				"alert_templates":     isEnterprise,
 			},
 		})

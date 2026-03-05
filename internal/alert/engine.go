@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -48,6 +49,11 @@ type Engine struct {
 	broadcaster  SSEBroadcaster
 	logger       *slog.Logger
 
+	// Extension points (Pro injects real implementations; CE uses no-ops)
+	escalator    Escalator
+	entityRouter EntityRouter
+	suppressor   MaintenanceSuppressor
+
 	// In-memory active alert map for recovery linking and dedup
 	activeAlerts map[activeAlertKey]*Alert
 	mu           sync.RWMutex
@@ -61,8 +67,47 @@ func NewEngine(alertStore AlertStore, channelStore ChannelStore, silenceStore Si
 		channelStore: channelStore,
 		silenceStore: silenceStore,
 		logger:       logger,
+		escalator:    noopEscalator{},
+		entityRouter: noopEntityRouter{},
+		suppressor:   noopSuppressor{},
 		activeAlerts: make(map[activeAlertKey]*Alert),
 	}
+}
+
+// SetEscalator sets the escalation extension.
+func (e *Engine) SetEscalator(esc Escalator) {
+	e.escalator = esc
+}
+
+// SetEntityRouter sets the entity routing extension.
+func (e *Engine) SetEntityRouter(r EntityRouter) {
+	e.entityRouter = r
+}
+
+// SetMaintenanceSuppressor sets the maintenance suppression extension.
+func (e *Engine) SetMaintenanceSuppressor(s MaintenanceSuppressor) {
+	e.suppressor = s
+}
+
+// noopEscalator is the Engine-internal no-op default.
+type noopEscalator struct{}
+
+func (noopEscalator) Evaluate(_ context.Context, _ string, _ time.Duration) (*EscalationAction, error) {
+	return nil, nil
+}
+
+// noopEntityRouter is the Engine-internal no-op default.
+type noopEntityRouter struct{}
+
+func (noopEntityRouter) Route(_ context.Context, _ string, _ string, _ string) ([]string, error) {
+	return nil, nil
+}
+
+// noopSuppressor is the Engine-internal no-op default.
+type noopSuppressor struct{}
+
+func (noopSuppressor) IsSuppressed(_ context.Context, _ string, _ string, _ string) (bool, error) {
+	return false, nil
 }
 
 // SetNotifier sets the webhook notifier for dispatching notifications.
@@ -79,6 +124,8 @@ func (e *Engine) SetBroadcaster(b SSEBroadcaster) {
 func (e *Engine) EventChannel() chan<- Event {
 	return e.eventCh
 }
+
+const defaultEscalationInterval = 60 * time.Second
 
 // Start begins the engine's event processing loop. Call this in a goroutine.
 func (e *Engine) Start(ctx context.Context) {
@@ -100,6 +147,79 @@ func (e *Engine) Start(ctx context.Context) {
 			}
 		}
 	}()
+
+	// Start escalation evaluator only when a real Escalator is injected
+	if _, isNoop := e.escalator.(noopEscalator); !isNoop {
+		go e.runEscalationEvaluator(ctx)
+	}
+}
+
+func (e *Engine) runEscalationEvaluator(ctx context.Context) {
+	ticker := time.NewTicker(defaultEscalationInterval)
+	defer ticker.Stop()
+
+	e.logger.Info("alert engine: escalation evaluator started", "interval", defaultEscalationInterval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			e.evaluateEscalations(ctx)
+		}
+	}
+}
+
+func (e *Engine) evaluateEscalations(ctx context.Context) {
+	alerts, err := e.alertStore.ListUnacknowledgedActiveAlerts(ctx)
+	if err != nil {
+		e.logger.Error("alert engine: list unacked alerts for escalation", "error", err)
+		return
+	}
+
+	now := time.Now()
+	for _, a := range alerts {
+		elapsed := now.Sub(a.FiredAt)
+		action, evalErr := e.escalator.Evaluate(ctx, strconv.FormatInt(a.ID, 10), elapsed)
+		if evalErr != nil {
+			e.logger.Error("alert engine: escalator evaluate error",
+				"error", evalErr, "alert_id", a.ID)
+			continue
+		}
+		if action == nil {
+			continue
+		}
+
+		// Dispatch escalation notification
+		chID, parseErr := strconv.ParseInt(action.ChannelID, 10, 64)
+		if parseErr != nil {
+			e.logger.Error("alert engine: invalid escalation channel ID",
+				"channel_id", action.ChannelID, "alert_id", a.ID)
+			continue
+		}
+
+		ch, chErr := e.channelStore.GetChannel(ctx, chID)
+		if chErr != nil || ch == nil {
+			e.logger.Error("alert engine: get escalation channel",
+				"error", chErr, "channel_id", chID, "alert_id", a.ID)
+			continue
+		}
+
+		e.enqueueDelivery(ctx, ch, a)
+
+		// Mark as escalated to prevent re-escalation
+		if setErr := e.alertStore.SetEscalatedAt(ctx, a.ID, now); setErr != nil {
+			e.logger.Error("alert engine: set escalated_at",
+				"error", setErr, "alert_id", a.ID)
+		}
+
+		e.logger.Info("alert escalated by policy",
+			"alert_id", a.ID,
+			"entity", a.EntityName,
+			"channel_id", chID,
+			"elapsed", elapsed,
+		)
+	}
 }
 
 func (e *Engine) reloadActiveAlerts(ctx context.Context) error {
@@ -358,6 +478,20 @@ func (e *Engine) checkSilenceRules(ctx context.Context, evt Event) bool {
 			return true
 		}
 	}
+
+	// Consult maintenance suppressor extension (Pro: calendar-based suppression)
+	suppressed, err := e.suppressor.IsSuppressed(ctx, evt.Source, evt.EntityType, fmt.Sprintf("%d", evt.EntityID))
+	if err != nil {
+		e.logger.Error("alert engine: maintenance suppressor error", "error", err)
+	} else if suppressed {
+		e.logger.Debug("alert: suppressed by maintenance window",
+			"source", evt.Source,
+			"entity_type", evt.EntityType,
+			"entity_id", evt.EntityID,
+		)
+		return true
+	}
+
 	return false
 }
 
@@ -396,46 +530,69 @@ func (e *Engine) dispatchNotifications(ctx context.Context, a *Alert) {
 		return
 	}
 
+	// Collect channels matching standard routing rules
+	dispatched := make(map[int64]bool)
 	for _, ch := range channels {
 		if !ch.Enabled {
-			e.logger.Debug("alert: channel skipped, disabled",
-				"channel_id", ch.ID,
-				"channel_name", ch.Name,
-			)
 			continue
 		}
-
 		if !matchesRoutingRules(ch, a) {
-			e.logger.Debug("alert: channel skipped, routing mismatch",
-				"channel_id", ch.ID,
-				"channel_name", ch.Name,
-			)
 			continue
 		}
-
-		delivery := &NotificationDelivery{
-			AlertID:   a.ID,
-			ChannelID: ch.ID,
-			Status:    DeliveryPending,
-		}
-		deliveryID, err := e.channelStore.InsertDelivery(ctx, delivery)
-		if err != nil {
-			e.logger.Error("alert engine: create delivery", "error", err, "channel_id", ch.ID)
-			continue
-		}
-		delivery.ID = deliveryID
-
-		e.logger.Debug("alert: dispatching notification",
-			"channel_id", ch.ID,
-			"channel_type", ch.Type,
-			"alert_id", a.ID,
-		)
-		e.notifier.Enqueue(NotificationJob{
-			Delivery: delivery,
-			Channel:  ch,
-			Alert:    a,
-		})
+		dispatched[ch.ID] = true
+		e.enqueueDelivery(ctx, ch, a)
 	}
+
+	// Consult entity router extension for additional channels (Pro: per-entity routing)
+	extraIDs, err := e.entityRouter.Route(ctx, a.EntityType, fmt.Sprintf("%d", a.EntityID), a.Severity)
+	if err != nil {
+		e.logger.Error("alert engine: entity router error", "error", err)
+	}
+	for _, chIDStr := range extraIDs {
+		chID, parseErr := strconv.ParseInt(chIDStr, 10, 64)
+		if parseErr != nil {
+			e.logger.Error("alert engine: invalid entity-routed channel ID", "channel_id", chIDStr)
+			continue
+		}
+		if dispatched[chID] {
+			continue // dedup
+		}
+		ch, chErr := e.channelStore.GetChannel(ctx, chID)
+		if chErr != nil {
+			e.logger.Error("alert engine: get entity-routed channel", "error", chErr, "channel_id", chID)
+			continue
+		}
+		if ch == nil || !ch.Enabled {
+			continue
+		}
+		dispatched[chID] = true
+		e.enqueueDelivery(ctx, ch, a)
+	}
+}
+
+func (e *Engine) enqueueDelivery(ctx context.Context, ch *NotificationChannel, a *Alert) {
+	delivery := &NotificationDelivery{
+		AlertID:   a.ID,
+		ChannelID: ch.ID,
+		Status:    DeliveryPending,
+	}
+	deliveryID, err := e.channelStore.InsertDelivery(ctx, delivery)
+	if err != nil {
+		e.logger.Error("alert engine: create delivery", "error", err, "channel_id", ch.ID)
+		return
+	}
+	delivery.ID = deliveryID
+
+	e.logger.Debug("alert: dispatching notification",
+		"channel_id", ch.ID,
+		"channel_type", ch.Type,
+		"alert_id", a.ID,
+	)
+	e.notifier.Enqueue(NotificationJob{
+		Delivery: delivery,
+		Channel:  ch,
+		Alert:    a,
+	})
 }
 
 func matchesRoutingRules(ch *NotificationChannel, a *Alert) bool {
@@ -549,6 +706,15 @@ func alertToMap(a *Alert) map[string]interface{} {
 	}
 	if a.ResolvedAt != nil {
 		m["resolved_at"] = a.ResolvedAt.UTC().Format(time.RFC3339)
+	}
+	if a.AcknowledgedAt != nil {
+		m["acknowledged_at"] = a.AcknowledgedAt.UTC().Format(time.RFC3339)
+	}
+	if a.AcknowledgedBy != "" {
+		m["acknowledged_by"] = a.AcknowledgedBy
+	}
+	if a.EscalatedAt != nil {
+		m["escalated_at"] = a.EscalatedAt.UTC().Format(time.RFC3339)
 	}
 
 	return m

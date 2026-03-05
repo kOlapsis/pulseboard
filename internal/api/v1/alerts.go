@@ -135,6 +135,53 @@ func (h *AlertHandler) HandleGetAlert(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, a)
 }
 
+// HandleAcknowledgeAlert handles POST /api/v1/alerts/{id}/acknowledge.
+func (h *AlertHandler) HandleAcknowledgeAlert(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "INVALID_PARAM", "invalid alert ID")
+		return
+	}
+
+	var input struct {
+		AcknowledgedBy string `json:"acknowledged_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		WriteError(w, http.StatusBadRequest, "INVALID_BODY", "invalid JSON body")
+		return
+	}
+	if input.AcknowledgedBy == "" {
+		WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "acknowledged_by is required")
+		return
+	}
+
+	a, err := h.alertStore.GetAlert(r.Context(), id)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to get alert")
+		return
+	}
+	if a == nil {
+		WriteError(w, http.StatusNotFound, "NOT_FOUND", "alert not found")
+		return
+	}
+	if a.Status != "active" || a.AcknowledgedAt != nil {
+		WriteError(w, http.StatusConflict, "CONFLICT", "alert is not active")
+		return
+	}
+
+	now := time.Now().UTC()
+	if err := h.alertStore.AcknowledgeAlert(r.Context(), id, input.AcknowledgedBy, now); err != nil {
+		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to acknowledge alert")
+		return
+	}
+
+	a.AcknowledgedAt = &now
+	a.AcknowledgedBy = input.AcknowledgedBy
+
+	h.broker.Broadcast(SSEEvent{Type: event.AlertAcknowledged, Data: a})
+	WriteJSON(w, http.StatusOK, a)
+}
+
 // --- Channel CRUD handlers ---
 
 // HandleListChannels handles GET /api/v1/channels.

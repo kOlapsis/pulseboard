@@ -62,20 +62,23 @@ type Event struct {
 
 // Alert represents a persisted alert record.
 type Alert struct {
-	ID           int64      `json:"id"`
-	Source       string     `json:"source"`
-	AlertType    string     `json:"alert_type"`
-	Severity     string     `json:"severity"`
-	Status       string     `json:"status"`
-	Message      string     `json:"message"`
-	EntityType   string     `json:"entity_type"`
-	EntityID     int64      `json:"entity_id"`
-	EntityName   string     `json:"entity_name"`
-	Details      string     `json:"details"`
-	ResolvedByID *int64     `json:"resolved_by_id"`
-	FiredAt      time.Time  `json:"fired_at"`
-	ResolvedAt   *time.Time `json:"resolved_at"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID             int64      `json:"id"`
+	Source         string     `json:"source"`
+	AlertType      string     `json:"alert_type"`
+	Severity       string     `json:"severity"`
+	Status         string     `json:"status"`
+	Message        string     `json:"message"`
+	EntityType     string     `json:"entity_type"`
+	EntityID       int64      `json:"entity_id"`
+	EntityName     string     `json:"entity_name"`
+	Details        string     `json:"details"`
+	ResolvedByID   *int64     `json:"resolved_by_id"`
+	FiredAt        time.Time  `json:"fired_at"`
+	ResolvedAt     *time.Time `json:"resolved_at"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	AcknowledgedBy string     `json:"acknowledged_by,omitempty"`
+	EscalatedAt    *time.Time `json:"escalated_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // NotificationChannel represents a configured delivery target.
@@ -137,6 +140,32 @@ type ListAlertsOpts struct {
 	Limit    int
 }
 
+// Escalator evaluates whether an unacknowledged alert should escalate to a secondary channel.
+type Escalator interface {
+	Evaluate(ctx context.Context, alertID string, elapsed time.Duration) (*EscalationAction, error)
+}
+
+// EscalationAction describes where and what to escalate.
+type EscalationAction struct {
+	ChannelID string
+	Message   string
+}
+
+// EntityRouter provides per-entity alert routing.
+type EntityRouter interface {
+	Route(ctx context.Context, entityType string, entityID string, severity string) ([]string, error)
+}
+
+// MaintenanceSuppressor checks if an alert should be suppressed during a maintenance window.
+type MaintenanceSuppressor interface {
+	IsSuppressed(ctx context.Context, source string, entityType string, entityID string) (bool, error)
+}
+
+// TemplateEngine renders notification messages using custom templates.
+type TemplateEngine interface {
+	Render(ctx context.Context, templateName string, vars map[string]any) (string, error)
+}
+
 // AlertStore defines the persistence interface for alerts.
 type AlertStore interface {
 	InsertAlert(ctx context.Context, a *Alert) (int64, error)
@@ -147,6 +176,9 @@ type AlertStore interface {
 	GetActiveAlert(ctx context.Context, source, alertType, entityType string, entityID int64) (*Alert, error)
 	ListActiveAlerts(ctx context.Context) ([]*Alert, error)
 	DeleteAlertsOlderThan(ctx context.Context, before time.Time) (int64, error)
+	AcknowledgeAlert(ctx context.Context, id int64, by string, at time.Time) error
+	SetEscalatedAt(ctx context.Context, id int64, at time.Time) error
+	ListUnacknowledgedActiveAlerts(ctx context.Context) ([]*Alert, error)
 }
 
 // ChannelStore defines the persistence interface for notification channels.

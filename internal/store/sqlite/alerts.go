@@ -37,7 +37,8 @@ func NewAlertStore(d *DB) *AlertStoreImpl {
 
 const alertColumns = `id, source, alert_type, severity, status, message,
 	entity_type, entity_id, entity_name, details,
-	resolved_by_id, fired_at, resolved_at, created_at`
+	resolved_by_id, fired_at, resolved_at,
+	acknowledged_at, acknowledged_by, escalated_at, created_at`
 
 func (s *AlertStoreImpl) InsertAlert(ctx context.Context, a *alert.Alert) (int64, error) {
 	res, err := s.writer.Exec(ctx,
@@ -189,11 +190,13 @@ func scanAlertFromRow(scanner rowScanner) (*alert.Alert, error) {
 	var firedAt, createdAt string
 	var resolvedAt, details sql.NullString
 	var resolvedByID sql.NullInt64
+	var acknowledgedAt, acknowledgedBy, escalatedAt sql.NullString
 
 	err := scanner.Scan(
 		&a.ID, &a.Source, &a.AlertType, &a.Severity, &a.Status, &a.Message,
 		&a.EntityType, &a.EntityID, &a.EntityName, &details,
-		&resolvedByID, &firedAt, &resolvedAt, &createdAt,
+		&resolvedByID, &firedAt, &resolvedAt,
+		&acknowledgedAt, &acknowledgedBy, &escalatedAt, &createdAt,
 	)
 	if err != nil {
 		return nil, err
@@ -212,7 +215,64 @@ func scanAlertFromRow(scanner rowScanner) (*alert.Alert, error) {
 		v := resolvedByID.Int64
 		a.ResolvedByID = &v
 	}
+	if acknowledgedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, acknowledgedAt.String)
+		a.AcknowledgedAt = &t
+	}
+	if acknowledgedBy.Valid {
+		a.AcknowledgedBy = acknowledgedBy.String
+	}
+	if escalatedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, escalatedAt.String)
+		a.EscalatedAt = &t
+	}
 	return a, nil
+}
+
+func (s *AlertStoreImpl) AcknowledgeAlert(ctx context.Context, id int64, by string, at time.Time) error {
+	_, err := s.writer.Exec(ctx,
+		`UPDATE alerts SET acknowledged_at = ?, acknowledged_by = ?
+		WHERE id = ? AND status = 'active' AND acknowledged_at IS NULL`,
+		at.UTC().Format(time.RFC3339), by, id,
+	)
+	if err != nil {
+		return fmt.Errorf("acknowledge alert: %w", err)
+	}
+	return nil
+}
+
+func (s *AlertStoreImpl) SetEscalatedAt(ctx context.Context, id int64, at time.Time) error {
+	_, err := s.writer.Exec(ctx,
+		`UPDATE alerts SET escalated_at = ? WHERE id = ?`,
+		at.UTC().Format(time.RFC3339), id,
+	)
+	if err != nil {
+		return fmt.Errorf("set escalated_at: %w", err)
+	}
+	return nil
+}
+
+func (s *AlertStoreImpl) ListUnacknowledgedActiveAlerts(ctx context.Context) ([]*alert.Alert, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+alertColumns+` FROM alerts
+		WHERE status = 'active' AND acknowledged_at IS NULL AND escalated_at IS NULL
+		ORDER BY fired_at ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("list unacknowledged active alerts: %w", err)
+	}
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+
+	var alerts []*alert.Alert
+	for rows.Next() {
+		a, err := scanAlertFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, a)
+	}
+	return alerts, rows.Err()
 }
 
 func nullableTimeStr(t *time.Time) *string {
