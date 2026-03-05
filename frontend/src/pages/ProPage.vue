@@ -34,7 +34,9 @@ onMounted(() => {
 })
 
 const isLicenseActive = computed(
-  () => isEnterprise.value && (licenseStatusValue.value === 'active' || licenseStatusValue.value === 'grace'),
+  () =>
+    isEnterprise.value &&
+    (licenseStatusValue.value === 'active' || licenseStatusValue.value === 'grace'),
 )
 
 const billingPeriod = ref<'monthly' | 'annual'>('annual')
@@ -94,12 +96,8 @@ const features = [
           Pro Edition
         </div>
         <h1 class="text-4xl font-bold text-white tracking-tight mb-4">
-          <template v-if="isLicenseActive">
-            You're on the Pro Edition
-          </template>
-          <template v-else>
-            Unlock the full power of maintenant
-          </template>
+          <template v-if="isLicenseActive"> You're on the Pro Edition </template>
+          <template v-else> Unlock the full power of maintenant </template>
         </h1>
         <p class="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Everything in Community, plus incident management, advanced notifications, vulnerability
@@ -118,8 +116,8 @@ const features = [
             <div>
               <h2 class="text-base font-semibold text-white mb-1">Thank you for your support</h2>
               <p class="text-sm text-slate-400 leading-relaxed">
-                Your Pro license is active. Thank you for supporting the development of maintenant
-                — it makes a real difference.
+                Your Pro license is active. Thank you for supporting the development of maintenant —
+                it makes a real difference.
               </p>
             </div>
           </div>
@@ -131,11 +129,7 @@ const features = [
             Included in your plan
           </h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div
-              v-for="feature in features"
-              :key="feature.title"
-              class="flex items-center gap-2.5"
-            >
+            <div v-for="feature in features" :key="feature.title" class="flex items-center gap-2.5">
               <Check :size="14" class="text-pb-green-500/60 shrink-0" />
               <span class="text-sm text-slate-400">{{ feature.title }}</span>
             </div>
@@ -227,7 +221,7 @@ const features = [
                 <span class="text-sm text-slate-500">/month</span>
               </div>
               <a
-                href="https://buy.stripe.com/test_4gMfZhcZ0fe977N88I2go00"
+                href="https://buy.stripe.com/8x28wO6dVdVd9UggHX33W00"
                 target="_blank"
                 class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
                 :class="
@@ -262,7 +256,7 @@ const features = [
               </div>
               <p class="text-xs text-emerald-400 mb-3">7.50€/month — save 18€</p>
               <a
-                href="https://buy.stripe.com/test_bJe14n0ceea51Nt3Ss2go01"
+                href="https://buy.stripe.com/3cI28qgSz6sL9Ug63j33W01"
                 target="_blank"
                 class="block w-full py-2 text-center rounded-lg text-sm font-semibold transition-colors"
                 :class="
