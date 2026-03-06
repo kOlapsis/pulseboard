@@ -31,6 +31,8 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: MAINTENANT_ADDR
+              value: "0.0.0.0:8080"
             - name: MAINTENANT_RUNTIME
               value: "kubernetes"
             - name: MAINTENANT_DB

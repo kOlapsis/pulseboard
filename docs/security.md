@@ -94,6 +94,7 @@ services:
       - /proc:/host/proc:ro
       - maintenant-data:/data
     environment:
+      MAINTENANT_ADDR: "0.0.0.0:8080"
       MAINTENANT_DB: "/data/maintenant.db"
       MAINTENANT_BASE_URL: "https://now.example.com"
 ```
