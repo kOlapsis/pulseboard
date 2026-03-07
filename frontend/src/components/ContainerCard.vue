@@ -75,6 +75,12 @@ function barColor(value: number): string {
   return 'var(--pb-status-ok)'
 }
 
+const imageTag = computed(() => {
+  const base = props.container.image.split('@')[0] ?? props.container.image
+  const parts = base.split(':')
+  return parts.length > 1 ? parts[parts.length - 1] : base
+})
+
 const formatTime = timeAgo
 
 function getStateStyle(state: string) {
@@ -88,121 +94,89 @@ function getStateStyle(state: string) {
 
 <template>
   <div
-    :style="{
-      backgroundColor: 'var(--pb-bg-surface)',
-      border: '1px solid var(--pb-border-default)',
-      borderRadius: 'var(--pb-radius-lg)',
-      padding: '1rem',
-      boxShadow: 'var(--pb-shadow-card)',
-      transition: 'box-shadow 0.15s ease, border-color 0.15s ease',
-      cursor: 'pointer',
-    }"
-    class="overflow-hidden hover:shadow-pb-elevated hover:border-slate-600"
+    class="bg-[#12151C] rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer overflow-hidden group"
     @click="emit('select', container)"
   >
-    <div class="flex items-start justify-between">
-      <div class="min-w-0 flex-1">
-        <div class="flex min-w-0 items-center gap-2">
-          <h3 class="min-w-0 truncate text-sm font-semibold" :style="{ color: 'var(--pb-text-primary)' }">
-            {{ container.name }}
-          </h3>
+    <!-- Header: name + state -->
+    <div class="px-4 pt-3.5 pb-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
           <span
             v-if="container.has_health_check && container.health_status"
-            class="inline-block h-2.5 w-2.5 rounded-full"
+            class="inline-block h-2 w-2 rounded-full shrink-0"
             :style="{ backgroundColor: container.state === 'running' ? (healthColors[container.health_status] || 'var(--pb-text-muted)') : 'var(--pb-text-muted)' }"
             :title="container.state === 'running' ? container.health_status : 'stopped'"
           />
+          <h3 class="truncate text-sm font-semibold text-white group-hover:text-pb-green-400 transition-colors">
+            {{ container.name }}
+          </h3>
         </div>
-        <div class="mt-0.5 flex items-center gap-2">
-          <p class="truncate text-xs" :style="{ color: 'var(--pb-text-muted)' }">
-            {{ container.image.split('@')[0] }}
-          </p>
-          <UpdateBadge :update="containerUpdate" />
-          <SecurityInsightBadge
-            :count="container.security_insight_count ?? 0"
-            :severity="container.security_highest_severity ?? null"
-          />
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span
+            v-if="container.state === 'restarting'"
+            class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+            :style="{
+              backgroundColor: 'var(--pb-status-critical-bg)',
+              color: 'var(--pb-status-critical)',
+            }"
+            title="Container is restart-looping"
+          >!!</span>
+          <span
+            class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+            :style="getStateStyle(container.state)"
+          >{{ container.state }}</span>
         </div>
       </div>
-      <div class="ml-2 flex items-center gap-2">
+
+      <!-- Badges row: image tag, update, security, posture -->
+      <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+        <span class="text-[10px] text-slate-500 truncate max-w-[140px]">{{ imageTag }}</span>
+        <UpdateBadge :update="containerUpdate" />
+        <SecurityInsightBadge
+          :count="container.security_insight_count ?? 0"
+          :severity="container.security_highest_severity ?? null"
+        />
         <PostureScoreBadge
           v-if="containerScore"
           :score="containerScore.score"
           :color="containerScore.color"
-          size="sm"
+          size="xs"
         />
-        <span
-          v-if="container.state === 'restarting'"
-          class="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium"
-          :style="{
-            backgroundColor: 'var(--pb-status-critical-bg)',
-            color: 'var(--pb-status-critical)',
-          }"
-          title="Container is restart-looping"
-        >
-          !!
-        </span>
-        <span
-          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-          :style="getStateStyle(container.state)"
-        >
-          {{ container.state }}
-        </span>
       </div>
     </div>
 
     <!-- Resource metrics (running containers only) -->
-    <div v-if="container.state === 'running' && metrics" class="mt-3 space-y-1.5">
-      <!-- CPU -->
-      <div class="flex items-center gap-2 text-xs">
-        <span class="w-8" :style="{ color: 'var(--pb-text-muted)' }">CPU</span>
-        <div
-          class="h-1.5 flex-1 rounded-full"
-          :style="{ backgroundColor: 'var(--pb-bg-elevated)' }"
-        >
+    <div v-if="container.state === 'running' && metrics" class="px-4 pb-1.5 space-y-1">
+      <div class="flex items-center gap-2 text-[10px]">
+        <span class="w-7 text-slate-600 font-bold uppercase">CPU</span>
+        <div class="h-1 flex-1 rounded-full bg-[#0B0E13]">
           <div
-            class="h-1.5 rounded-full transition-all"
+            class="h-1 rounded-full transition-all"
             :style="{ width: cpuBarWidth + '%', backgroundColor: barColor(cpuBarWidth) }"
           />
         </div>
-        <span class="w-12 text-right" :style="{ color: 'var(--pb-text-secondary)' }">{{ metrics.cpu }}</span>
+        <span class="w-10 text-right text-slate-400 font-mono">{{ metrics.cpu }}</span>
       </div>
-      <!-- Memory -->
-      <div class="flex items-center gap-2 text-xs">
-        <span class="w-8" :style="{ color: 'var(--pb-text-muted)' }">MEM</span>
-        <div
-          class="h-1.5 flex-1 rounded-full"
-          :style="{ backgroundColor: 'var(--pb-bg-elevated)' }"
-        >
+      <div class="flex items-center gap-2 text-[10px]">
+        <span class="w-7 text-slate-600 font-bold uppercase">MEM</span>
+        <div class="h-1 flex-1 rounded-full bg-[#0B0E13]">
           <div
-            class="h-1.5 rounded-full transition-all"
+            class="h-1 rounded-full transition-all"
             :style="{ width: memBarWidth + '%', backgroundColor: barColor(memBarWidth) }"
           />
         </div>
-        <span class="w-12 text-right" :style="{ color: 'var(--pb-text-secondary)' }">{{ metrics.memPercent }}</span>
+        <span class="w-10 text-right text-slate-400 font-mono">{{ metrics.memPercent }}</span>
       </div>
-      <!-- Network & Block I/O -->
-      <div class="flex gap-3 text-xs" :style="{ color: 'var(--pb-text-muted)' }">
-        <span>Net: {{ metrics.netRx }}/{{ metrics.netTx }}</span>
-        <span>I/O: {{ metrics.blockRead }}/{{ metrics.blockWrite }}</span>
-      </div>
-    </div>
-
-    <!-- Stopped container -->
-    <div v-else-if="container.state !== 'running'" class="mt-3 text-xs" :style="{ color: 'var(--pb-text-muted)' }">
-      Resources: --
     </div>
 
     <!-- K8s pod count badge -->
     <div
       v-if="container.runtime_type === 'kubernetes' && container.pod_count && container.pod_count > 0"
-      class="mt-2 flex items-center gap-2 text-xs"
-      :style="{ color: 'var(--pb-text-muted)' }"
+      class="px-4 pb-1.5 flex items-center gap-2 text-[10px]"
     >
       <span
         v-if="container.controller_kind"
-        class="rounded px-1.5 py-0.5"
-        :style="{ backgroundColor: 'var(--pb-bg-elevated)', color: 'var(--pb-text-secondary)' }"
+        class="rounded px-1.5 py-0.5 bg-slate-800 text-slate-400"
       >{{ container.controller_kind }}</span>
       <span
         :style="{
@@ -214,19 +188,20 @@ function getStateStyle(state: string) {
     <!-- Error detail -->
     <div
       v-if="container.error_detail"
-      class="mt-1 truncate text-xs"
+      class="px-4 pb-1.5 truncate text-[10px]"
       :style="{ color: 'var(--pb-status-down)' }"
       :title="container.error_detail"
     >{{ container.error_detail }}</div>
 
-    <div class="mt-3 flex items-center justify-between text-xs" :style="{ color: 'var(--pb-text-muted)' }">
-      <span v-if="container.orchestration_unit" class="truncate">
+    <!-- Footer -->
+    <div class="px-4 py-2 flex items-center justify-between text-[10px] text-slate-600 border-t border-slate-800/50">
+      <span v-if="container.orchestration_unit" class="truncate font-medium">
         {{ container.orchestration_unit }}
       </span>
-      <span v-else class="truncate">
+      <span v-else class="truncate font-mono">
         {{ container.external_id.slice(0, 12) }}
       </span>
-      <span>{{ formatTime(container.last_state_change_at) }}</span>
+      <span class="shrink-0">{{ formatTime(container.last_state_change_at) }}</span>
     </div>
   </div>
 </template>
