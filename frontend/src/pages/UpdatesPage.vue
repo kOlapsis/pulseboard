@@ -87,7 +87,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="overflow-y-auto p-6">
+  <div class="overflow-y-auto p-3 sm:p-6">
     <div class="max-w-7xl mx-auto space-y-6 pb-12">
 
       <!-- Header -->

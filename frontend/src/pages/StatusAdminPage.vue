@@ -19,9 +19,10 @@ import StatusIncidentManager from '@/components/StatusIncidentManager.vue'
 import StatusSmtpConfig from '@/components/StatusSmtpConfig.vue'
 import StatusMaintenanceManager from '@/components/StatusMaintenanceManager.vue'
 import FeatureGate from '@/components/FeatureGate.vue'
+import SmtpNotConfigured from '@/components/SmtpNotConfigured.vue'
 import { useEdition } from '@/composables/useEdition'
 
-const { hasFeature } = useEdition()
+const { hasFeature, isEnterprise } = useEdition()
 
 const store = useStatusAdminStore()
 const activeTab = ref<'components' | 'incidents' | 'maintenance' | 'subscribers' | 'smtp'>('components')
@@ -40,7 +41,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="overflow-y-auto p-3 sm:p-6">
+  <div class="max-w-7xl mx-auto">
     <div class="mb-6">
       <h1 class="text-2xl font-black text-white">Status Page</h1>
       <p class="mt-1 text-sm" style="color: var(--pb-text-muted)">
@@ -148,6 +150,10 @@ onUnmounted(() => {
     </FeatureGate>
     <FeatureGate v-else-if="activeTab === 'smtp'" feature="smtp" title="SMTP Configuration" description="Use your own mail server to send notifications. Full control over sender address, branding, and deliverability.">
       <StatusSmtpConfig />
+      <template v-if="isEnterprise" #placeholder>
+        <SmtpNotConfigured />
+      </template>
     </FeatureGate>
+  </div>
   </div>
 </template>

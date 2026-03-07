@@ -35,7 +35,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="overflow-y-auto p-6">
+  <div class="overflow-y-auto p-3 sm:p-6">
     <div class="mx-auto max-w-7xl">
     <div class="mb-6">
       <h1 class="text-2xl font-black text-white">Endpoints</h1>

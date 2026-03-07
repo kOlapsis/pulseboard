@@ -37,7 +37,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="overflow-y-auto p-3 sm:p-6">
+  <div class="max-w-7xl mx-auto">
     <div class="mb-6">
       <h1 class="text-2xl font-black text-white">Alerts</h1>
       <p class="mt-1 text-sm text-slate-500">
@@ -135,5 +136,6 @@ onUnmounted(() => {
     <AlertList v-if="activeTab === 'history'" />
     <ChannelManager v-else-if="activeTab === 'channels'" />
     <SilenceRuleManager v-else-if="activeTab === 'silence'" />
+  </div>
   </div>
 </template>

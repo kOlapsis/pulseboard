@@ -16,8 +16,9 @@ import { ref, computed } from 'vue'
 import { createChannel, testChannel } from '@/services/alertApi'
 import { useEdition } from '@/composables/useEdition'
 import FeatureGate from '@/components/FeatureGate.vue'
+import SmtpNotConfigured from '@/components/SmtpNotConfigured.vue'
 
-const { hasFeature } = useEdition()
+const { hasFeature, isEnterprise } = useEdition()
 
 const emit = defineEmits<{
   created: [id: number]
@@ -249,6 +250,11 @@ function goBack() {
             <span class="text-sm font-medium" style="color: var(--pb-text-primary)">{{ type.label }}</span>
             <span class="text-[11px]" style="color: var(--pb-text-muted)">{{ type.description }}</span>
           </button>
+
+          <!-- Custom placeholder: Pro active but SMTP not configured -->
+          <template v-if="type.feature === 'smtp' && isEnterprise" #placeholder>
+            <SmtpNotConfigured :title="type.label" />
+          </template>
         </FeatureGate>
       </div>
 

@@ -12,7 +12,8 @@
 -->
 
 <template>
-  <div class="p-4 sm:p-6 max-w-5xl mx-auto">
+  <div class="overflow-y-auto p-3 sm:p-6">
+  <div class="max-w-7xl mx-auto">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-xl font-semibold" style="color: var(--pb-text-primary)">Webhooks</h1>
       <button
@@ -126,6 +127,7 @@
     </div>
 
     <WebhookForm v-if="showCreate" @close="showCreate = false" @created="onCreated" />
+  </div>
   </div>
 </template>
 
