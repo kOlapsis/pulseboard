@@ -38,6 +38,13 @@ var (
 // EventCallback is called when a certificate event occurs (for SSE broadcasting).
 type EventCallback func(eventType string, data interface{})
 
+// Deps holds all dependencies for the certificate Service.
+type Deps struct {
+	Store         CertificateStore // required
+	Logger        *slog.Logger     // required
+	EventCallback EventCallback    // optional — nil-safe
+}
+
 // Service orchestrates certificate monitoring.
 type Service struct {
 	store   CertificateStore
@@ -47,10 +54,17 @@ type Service struct {
 }
 
 // NewService creates a new certificate service.
-func NewService(store CertificateStore, logger *slog.Logger) *Service {
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("certificate.NewService: Store is required")
+	}
+	if d.Logger == nil {
+		panic("certificate.NewService: Logger is required")
+	}
 	return &Service{
-		store:  store,
-		logger: logger,
+		store:   d.Store,
+		logger:  d.Logger,
+		onEvent: d.EventCallback,
 	}
 }
 

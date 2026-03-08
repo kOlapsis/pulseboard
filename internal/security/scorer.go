@@ -85,6 +85,18 @@ type cachedScore struct {
 	expiresAt time.Time
 }
 
+// ScorerDeps holds all dependencies for the security Scorer.
+type ScorerDeps struct {
+	Certs              CertificateReader    // optional — nil skips TLS scoring
+	CVEs               CVEReader            // optional — nil skips CVE scoring
+	Updates            UpdateReader         // optional — nil skips update scoring
+	Security           *Service             // optional — nil skips network exposure scoring
+	Acks               AcknowledgmentStore  // required
+	Threshold          int                  // optional — 0 disables alerts
+	PostureAlertCallback PostureAlertCallback // optional — nil-safe
+	PostureEventCallback PostureEventCallback // optional — nil-safe
+}
+
 // Scorer computes security posture scores for containers and infrastructure.
 type Scorer struct {
 	certs   CertificateReader
@@ -102,14 +114,21 @@ type Scorer struct {
 }
 
 // NewScorer creates a new Scorer with the given data source readers.
-func NewScorer(certs CertificateReader, cves CVEReader, updates UpdateReader, sec *Service, acks AcknowledgmentStore) *Scorer {
+// All readers are optional — categories with nil readers are skipped during scoring.
+func NewScorer(d ScorerDeps) *Scorer {
+	if d.Acks == nil {
+		panic("security.NewScorer: Acks is required")
+	}
 	return &Scorer{
-		certs:   certs,
-		cves:    cves,
-		updates: updates,
-		sec:     sec,
-		acks:    acks,
-		cache:   make(map[int64]cachedScore),
+		certs:          d.Certs,
+		cves:           d.CVEs,
+		updates:        d.Updates,
+		sec:            d.Security,
+		acks:           d.Acks,
+		cache:          make(map[int64]cachedScore),
+		threshold:      d.Threshold,
+		onPostureAlert: d.PostureAlertCallback,
+		onPostureEvent: d.PostureEventCallback,
 	}
 }
 

@@ -22,6 +22,17 @@ import (
 // MonitorStatusProvider resolves the current health status of a specific monitor.
 type MonitorStatusProvider func(ctx context.Context, monitorType string, monitorID int64) string
 
+// Deps holds all dependencies for the status Service.
+type Deps struct {
+	Components      ComponentStore        // required
+	Logger          *slog.Logger          // required
+	Incidents       IncidentStore         // optional — nil-safe
+	Maintenance     MaintenanceStore      // optional — nil-safe
+	MonitorStatus   MonitorStatusProvider // optional — nil-safe
+	Broadcaster     func(eventType string, data interface{}) // optional — nil-safe
+	Subscribers     *SubscriberService    // optional — nil-safe
+}
+
 // Service encapsulates public status page business logic.
 type Service struct {
 	components  ComponentStore
@@ -37,13 +48,21 @@ type Service struct {
 }
 
 // NewService creates a new status page service.
-func NewService(
-	components ComponentStore,
-	logger *slog.Logger,
-) *Service {
+func NewService(d Deps) *Service {
+	if d.Components == nil {
+		panic("status.NewService: Components is required")
+	}
+	if d.Logger == nil {
+		panic("status.NewService: Logger is required")
+	}
 	return &Service{
-		components: components,
-		logger:     logger,
+		components:    d.Components,
+		logger:        d.Logger,
+		incidents:     d.Incidents,
+		maintenance:   d.Maintenance,
+		monitorStatus: d.MonitorStatus,
+		broadcaster:   d.Broadcaster,
+		subscribers:   d.Subscribers,
 	}
 }
 

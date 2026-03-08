@@ -80,7 +80,7 @@ func (m *mockAckStore) IsAcknowledged(_ context.Context, containerExternalID, fi
 }
 
 func newTestService() *Service {
-	return NewService(slog.Default())
+	return NewService(Deps{Logger: slog.Default()})
 }
 
 func TestScoreTLS(t *testing.T) {
@@ -311,19 +311,19 @@ func TestScorerScoreContainer(t *testing.T) {
 		{Type: PortExposedAllInterfaces, Severity: SeverityHigh, ContainerID: 1, ContainerName: "test-container"},
 	})
 
-	scorer := NewScorer(
-		&mockCertReader{certs: map[string][]CertificateInfo{
+	scorer := NewScorer(ScorerDeps{
+		Certs: &mockCertReader{certs: map[string][]CertificateInfo{
 			"ext-1": {{Status: "valid", DaysRemaining: 90}},
 		}},
-		&mockCVEReader{cves: map[string][]CVEInfo{
+		CVEs: &mockCVEReader{cves: map[string][]CVEInfo{
 			"ext-1": {{CVEID: "CVE-2025-001", Severity: "high"}},
 		}},
-		&mockUpdateReader{updates: map[string][]UpdateInfo{
+		Updates: &mockUpdateReader{updates: map[string][]UpdateInfo{
 			"ext-1": {{UpdateType: "minor", PublishedAt: timePtr(time.Now().Add(-15 * 24 * time.Hour))}},
 		}},
-		secSvc,
-		&mockAckStore{},
-	)
+		Security: secSvc,
+		Acks:     &mockAckStore{},
+	})
 
 	score, err := scorer.ScoreContainer(ctx, 1, "ext-1", "test-container")
 	require.NoError(t, err)
@@ -345,7 +345,7 @@ func TestScorerWeightRedistribution(t *testing.T) {
 		{Type: PrivilegedContainer, Severity: SeverityCritical, ContainerID: 1},
 	})
 
-	scorer := NewScorer(nil, nil, nil, secSvc, &mockAckStore{})
+	scorer := NewScorer(ScorerDeps{Security: secSvc, Acks: &mockAckStore{}})
 	score, err := scorer.ScoreContainer(ctx, 1, "ext-1", "test")
 	require.NoError(t, err)
 	require.NotNil(t, score)
@@ -369,7 +369,7 @@ func TestScorerCache(t *testing.T) {
 
 	callCount := 0
 	cveReader := &mockCVEReader{cves: map[string][]CVEInfo{}}
-	scorer := NewScorer(nil, cveReader, nil, secSvc, &mockAckStore{})
+	scorer := NewScorer(ScorerDeps{CVEs: cveReader, Security: secSvc, Acks: &mockAckStore{}})
 
 	// Wrap to count calls (we test via timing)
 	_, err := scorer.ScoreContainer(ctx, 1, "ext-1", "test")
@@ -400,7 +400,7 @@ func TestScorerAcknowledgedFindingsExcluded(t *testing.T) {
 		},
 	}
 
-	scorer := NewScorer(nil, nil, nil, secSvc, ackStore)
+	scorer := NewScorer(ScorerDeps{Security: secSvc, Acks: ackStore})
 
 	score, err := scorer.ScoreContainer(ctx, 1, "ext-1", "test")
 	require.NoError(t, err)
@@ -426,7 +426,7 @@ func TestScoreInfrastructure(t *testing.T) {
 		{Type: PrivilegedContainer, Severity: SeverityCritical, ContainerID: 1},
 	})
 
-	scorer := NewScorer(nil, nil, nil, secSvc, &mockAckStore{})
+	scorer := NewScorer(ScorerDeps{Security: secSvc, Acks: &mockAckStore{}})
 
 	containers := []ContainerInfo{
 		{ID: 1, ExternalID: "ext-1", Name: "container-a"},
@@ -446,7 +446,7 @@ func TestScorerNoDataReturnsNil(t *testing.T) {
 	ctx := context.Background()
 
 	// All readers nil including security service → no applicable categories → nil score
-	scorer := NewScorer(nil, nil, nil, nil, &mockAckStore{})
+	scorer := NewScorer(ScorerDeps{Acks: &mockAckStore{}})
 	score, err := scorer.ScoreContainer(ctx, 99, "nonexistent", "ghost")
 	require.NoError(t, err)
 	assert.Nil(t, score, "container with no data for any category should return nil")
@@ -457,7 +457,7 @@ func TestScorerWithSecurityServiceNoInsights(t *testing.T) {
 	secSvc := newTestService()
 
 	// Security service exists but no insights for this container → network_exposure applicable with score 100
-	scorer := NewScorer(nil, nil, nil, secSvc, &mockAckStore{})
+	scorer := NewScorer(ScorerDeps{Security: secSvc, Acks: &mockAckStore{}})
 	score, err := scorer.ScoreContainer(ctx, 99, "nonexistent", "ghost")
 	require.NoError(t, err)
 	require.NotNil(t, score)

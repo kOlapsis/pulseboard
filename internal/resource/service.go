@@ -25,6 +25,15 @@ import (
 // EventCallback is the function signature for SSE event broadcasting.
 type EventCallback func(eventType string, data interface{})
 
+// Deps holds all dependencies for the resource Service.
+type Deps struct {
+	Store        ResourceStore        // required
+	Runtime      pbruntime.Runtime    // required
+	ContainerSvc *container.Service   // required
+	Logger       *slog.Logger         // required
+	EventCallback EventCallback       // optional — nil-safe
+}
+
 // Service orchestrates resource collection, persistence, and alerting.
 type Service struct {
 	store         ResourceStore
@@ -35,14 +44,27 @@ type Service struct {
 }
 
 // NewService creates a resource monitoring service.
-func NewService(store ResourceStore, rt pbruntime.Runtime, containerSvc *container.Service, logger *slog.Logger) *Service {
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("resource.NewService: Store is required")
+	}
+	if d.Runtime == nil {
+		panic("resource.NewService: Runtime is required")
+	}
+	if d.ContainerSvc == nil {
+		panic("resource.NewService: ContainerSvc is required")
+	}
+	if d.Logger == nil {
+		panic("resource.NewService: Logger is required")
+	}
 	s := &Service{
-		store:        store,
-		containerSvc: containerSvc,
-		logger:       logger,
+		store:         d.Store,
+		containerSvc:  d.ContainerSvc,
+		logger:        d.Logger,
+		eventCallback: d.EventCallback,
 	}
 
-	s.collector = NewCollector(rt, containerSvc, logger)
+	s.collector = NewCollector(d.Runtime, d.ContainerSvc, d.Logger)
 	s.collector.SetOnSnapshot(s.processSnapshot)
 
 	return s

@@ -53,6 +53,16 @@ var (
 	ErrInvalidExitCode   = errors.New("invalid exit code")
 )
 
+// Deps holds all dependencies for the heartbeat Service.
+type Deps struct {
+	Store          HeartbeatStore // required
+	Logger         *slog.Logger   // required
+	LicenseChecker LicenseChecker // optional — defaults to community limits
+	EventCallback  EventCallback  // optional — nil-safe
+	AlertCallback  AlertCallback  // optional — nil-safe
+	BaseURL        string         // optional
+}
+
 // Service orchestrates heartbeat monitoring logic.
 type Service struct {
 	store          HeartbeatStore
@@ -63,15 +73,25 @@ type Service struct {
 	baseURL        string
 }
 
-// NewService creates a new heartbeat service.
-func NewService(store HeartbeatStore, logger *slog.Logger, licenseChecker LicenseChecker) *Service {
-	if licenseChecker == nil {
-		licenseChecker = &DefaultLicenseChecker{MaxHeartbeats: 10}
+// NewService creates a new heartbeat service with all dependencies.
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("heartbeat.NewService: Store is required")
+	}
+	if d.Logger == nil {
+		panic("heartbeat.NewService: Logger is required")
+	}
+	lc := d.LicenseChecker
+	if lc == nil {
+		lc = &DefaultLicenseChecker{MaxHeartbeats: 10}
 	}
 	return &Service{
-		store:          store,
-		logger:         logger,
-		licenseChecker: licenseChecker,
+		store:          d.Store,
+		logger:         d.Logger,
+		licenseChecker: lc,
+		onEvent:        d.EventCallback,
+		alertCallback:  d.AlertCallback,
+		baseURL:        d.BaseURL,
 	}
 }
 

@@ -30,6 +30,16 @@ type AlertCallback func(ep *Endpoint, result CheckResult) (eventType string, eve
 // EndpointRemovedCallback is called when an endpoint is deactivated (label removed or container destroyed).
 type EndpointRemovedCallback func(ctx context.Context, endpointID int64)
 
+// Deps holds all dependencies for the endpoint Service.
+type Deps struct {
+	Store                   EndpointStore           // required
+	Engine                  *CheckEngine            // required
+	Logger                  *slog.Logger            // required
+	EventCallback           EventCallback           // optional — nil-safe
+	AlertCallback           AlertCallback           // optional — nil-safe
+	EndpointRemovedCallback EndpointRemovedCallback // optional — nil-safe
+}
+
 // Service orchestrates endpoint discovery, persistence, and the check engine.
 type Service struct {
 	store             EndpointStore
@@ -41,12 +51,24 @@ type Service struct {
 	ctx               context.Context
 }
 
-// NewService creates a new endpoint service.
-func NewService(store EndpointStore, engine *CheckEngine, logger *slog.Logger) *Service {
+// NewService creates a new endpoint service with all dependencies.
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("endpoint.NewService: Store is required")
+	}
+	if d.Engine == nil {
+		panic("endpoint.NewService: Engine is required")
+	}
+	if d.Logger == nil {
+		panic("endpoint.NewService: Logger is required")
+	}
 	return &Service{
-		store:  store,
-		engine: engine,
-		logger: logger,
+		store:             d.Store,
+		engine:            d.Engine,
+		logger:            d.Logger,
+		onEvent:           d.EventCallback,
+		alertCallback:     d.AlertCallback,
+		onEndpointRemoved: d.EndpointRemovedCallback,
 	}
 }
 

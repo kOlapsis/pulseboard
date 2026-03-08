@@ -45,6 +45,17 @@ type ContainerLister interface {
 	ListContainerInfos(ctx context.Context) ([]ContainerInfo, error)
 }
 
+// Deps holds all dependencies for the update Service.
+type Deps struct {
+	Store         UpdateStore     // required
+	Scanner       *Scanner        // required
+	Containers    ContainerLister // required
+	Logger        *slog.Logger    // required
+	Enricher      UpdateEnricher  // optional — defaults to no-op
+	EventCallback EventCallback   // optional — nil-safe
+	AlertChan     chan<- interface{} // optional — nil-safe
+}
+
 // Service orchestrates update detection and notification.
 type Service struct {
 	store         UpdateStore
@@ -64,20 +75,38 @@ type Service struct {
 }
 
 // NewService creates the update intelligence service.
-func NewService(store UpdateStore, scanner *Scanner, containers ContainerLister, logger *slog.Logger) *Service {
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("update.NewService: Store is required")
+	}
+	if d.Scanner == nil {
+		panic("update.NewService: Scanner is required")
+	}
+	if d.Containers == nil {
+		panic("update.NewService: Containers is required")
+	}
+	if d.Logger == nil {
+		panic("update.NewService: Logger is required")
+	}
+	enricher := d.Enricher
+	if enricher == nil {
+		enricher = noopUpdateEnricher{}
+	}
 	interval := 24 * time.Hour
 	if v := os.Getenv("MAINTENANT_UPDATE_INTERVAL"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d > 0 {
-			interval = d
+		if dd, err := time.ParseDuration(v); err == nil && dd > 0 {
+			interval = dd
 		}
 	}
 	return &Service{
-		store:      store,
-		scanner:    scanner,
-		containers: containers,
-		logger:     logger,
-		interval:   interval,
-		enricher:   noopUpdateEnricher{},
+		store:         d.Store,
+		scanner:       d.Scanner,
+		containers:    d.Containers,
+		logger:        d.Logger,
+		interval:      interval,
+		enricher:      enricher,
+		eventCallback: d.EventCallback,
+		alertChan:     d.AlertChan,
 	}
 }
 

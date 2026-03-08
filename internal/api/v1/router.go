@@ -325,44 +325,6 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	// SSE endpoint
 	r.mux.Handle("GET /api/v1/containers/events", broker)
 
-	// Wire SSE broadcasting from container service events
-	svc.SetEventCallback(func(eventType string, data interface{}) {
-		broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-	})
-
-	// Wire SSE broadcasting from endpoint service events
-	if epSvc != nil {
-		epSvc.SetEventCallback(func(eventType string, data interface{}) {
-			broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-		})
-	}
-
-	// Wire SSE broadcasting from heartbeat service events
-	if hbSvc != nil {
-		hbSvc.SetEventCallback(func(eventType string, data interface{}) {
-			broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-		})
-	}
-
-	// Wire SSE broadcasting from certificate service events
-	if certSvc != nil {
-		certSvc.SetEventCallback(func(eventType string, data interface{}) {
-			broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-		})
-	}
-
-	// Wire endpoint removal to certificate monitor cleanup
-	if epSvc != nil && certSvc != nil {
-		epSvc.SetEndpointRemovedCallback(certSvc.DeactivateByEndpointID)
-	}
-
-	// Wire SSE broadcasting from resource service events
-	if resSvc != nil {
-		resSvc.SetEventCallback(func(eventType string, data interface{}) {
-			broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-		})
-	}
-
 	return r
 }
 
@@ -414,10 +376,6 @@ func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore upd
 	r.mux.HandleFunc("GET /api/v1/risk/{container_id}", requireEnterprise(rh.HandleGetContainerRisk))
 	r.mux.HandleFunc("GET /api/v1/risk/{container_id}/history", requireEnterprise(rh.HandleGetRiskHistory))
 
-	// Wire SSE broadcasting
-	updateSvc.SetEventCallback(func(eventType string, data interface{}) {
-		r.broker.Broadcast(SSEEvent{Type: eventType, Data: data})
-	})
 }
 
 // RegisterSecurityRoutes registers security insight endpoints.

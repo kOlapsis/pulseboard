@@ -1,0 +1,474 @@
+// Copyright 2026 Benjamin Touchard (Kolapsis)
+//
+// Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0)
+// or a commercial license. You may not use this file except in compliance
+// with one of these licenses.
+//
+// AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
+// Commercial: See LICENSE-COMMERCIAL.md
+//
+// Source: https://github.com/kolapsis/maintenant
+
+package app
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"path/filepath"
+	"time"
+
+	"github.com/kolapsis/maintenant/internal/alert"
+	v1 "github.com/kolapsis/maintenant/internal/api/v1"
+	"github.com/kolapsis/maintenant/internal/certificate"
+	"github.com/kolapsis/maintenant/internal/container"
+	"github.com/kolapsis/maintenant/internal/endpoint"
+	"github.com/kolapsis/maintenant/internal/extension"
+	"github.com/kolapsis/maintenant/internal/heartbeat"
+	"github.com/kolapsis/maintenant/internal/license"
+	pbmcp "github.com/kolapsis/maintenant/internal/mcp"
+	"github.com/kolapsis/maintenant/internal/ratelimit"
+	"github.com/kolapsis/maintenant/internal/resource"
+	pbruntime "github.com/kolapsis/maintenant/internal/runtime"
+	"github.com/kolapsis/maintenant/internal/security"
+	"github.com/kolapsis/maintenant/internal/status"
+	"github.com/kolapsis/maintenant/internal/store/sqlite"
+	"github.com/kolapsis/maintenant/internal/update"
+	"github.com/kolapsis/maintenant/internal/webhook"
+	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// App holds all application services and manages their lifecycle.
+type App struct {
+	cfg    Config
+	logger *slog.Logger
+
+	// Infrastructure
+	db  *sqlite.DB
+	rt  pbruntime.Runtime
+
+	// Core services
+	containerSvc   *container.Service
+	endpointSvc    *endpoint.Service
+	heartbeatSvc   *heartbeat.Service
+	certSvc        *certificate.Service
+	resourceSvc    *resource.Service
+	securitySvc    *security.Service
+	updateSvc      *update.Service
+	statusSvc      *status.Service
+	subscriberSvc  *status.SubscriberService
+
+	// Alert pipeline
+	alertEngine *alert.Engine
+	notifier    *alert.Notifier
+
+	// HTTP
+	broker        *v1.SSEBroker
+	statusBroker  *v1.SSEBroker
+	router        *v1.Router
+	statusHandler *status.Handler
+	srv           *http.Server
+
+	// Stores (needed for retention cleanup and reconciliation)
+	alertStore       alert.AlertStore
+	updateStore      update.UpdateStore
+	containerStore   *sqlite.ContainerStore
+	epStore          *sqlite.EndpointStore
+	hbStore          *sqlite.HeartbeatStore
+	certStore        *sqlite.CertificateStore
+	resStore         *sqlite.ResourceStore
+
+	// Background services
+	checkEngine     *endpoint.CheckEngine
+	maintScheduler  *status.MaintenanceScheduler
+	scorer          *security.Scorer
+	rl              *ratelimit.Limiter
+	licenseMgr      *license.LicenseManager
+	mcpServer       *gomcp.Server
+
+	// Webhook
+	webhookDispatcher *webhook.Dispatcher
+}
+
+// New creates and wires all application services.
+func New(cfg Config, logger *slog.Logger) (*App, error) {
+	a := &App{
+		cfg:    cfg,
+		logger: logger,
+	}
+
+	v1.SetBuildVersion(cfg.Version)
+	v1.SetOrganisationName(cfg.OrgName)
+
+	if cfg.K8sNamespaces != "" {
+		logger.Info("K8s namespace allowlist configured", "namespaces", cfg.K8sNamespaces)
+	}
+	if cfg.K8sExcludeNS != "" {
+		logger.Info("K8s namespace blocklist configured", "exclude_namespaces", cfg.K8sExcludeNS)
+	}
+
+	// --- Database ---
+	db, err := sqlite.Open(cfg.DBPath, logger)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	a.db = db
+
+	if err := sqlite.Migrate(db.ReadDB(), logger); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("run migrations: %w", err)
+	}
+
+	// --- Stores ---
+	store := sqlite.NewContainerStore(db)
+	a.containerStore = store
+	epStore := sqlite.NewEndpointStore(db)
+	a.epStore = epStore
+	hbStore := sqlite.NewHeartbeatStore(db)
+	a.hbStore = hbStore
+	certStore := sqlite.NewCertificateStore(db)
+	a.certStore = certStore
+	resStore := sqlite.NewResourceStore(db)
+	a.resStore = resStore
+	alertStore := sqlite.NewAlertStore(db)
+	a.alertStore = alertStore
+	channelStore := sqlite.NewChannelStore(db)
+	silenceStore := sqlite.NewSilenceStore(db)
+	statusCompStore := sqlite.NewStatusComponentStore(db)
+	incidentStore := sqlite.NewIncidentStore(db)
+	maintenanceStore := sqlite.NewMaintenanceStore(db)
+	subscriberStore := sqlite.NewSubscriberStore(db)
+	webhookStore := sqlite.NewWebhookStore(db)
+	updateStore := sqlite.NewUpdateStore(db)
+	a.updateStore = updateStore
+
+	// --- License manager ---
+	license.InitPublicKey(cfg.PublicKeyB64)
+	if cfg.LicenseKey != "" {
+		dataDir := filepath.Dir(cfg.DBPath)
+		lm, err := license.NewLicenseManager(cfg.LicenseKey, dataDir, cfg.Version, logger)
+		if err != nil {
+			logger.Warn("license manager initialization failed, running as Community Edition", "error", err)
+		} else {
+			a.licenseMgr = lm
+			extension.CurrentEdition = func() extension.Edition {
+				if lm.IsProEnabled() {
+					return extension.Enterprise
+				}
+				return extension.Community
+			}
+		}
+	}
+
+	// --- Runtime detection ---
+	ctx := context.Background()
+	rt, err := pbruntime.Detect(ctx, logger)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("detect container runtime: %w", err)
+	}
+	a.rt = rt
+
+	if err := rt.Connect(ctx); err != nil {
+		rt.Close()
+		db.Close()
+		return nil, fmt.Errorf("connect to runtime %s: %w", rt.Name(), err)
+	}
+
+	// --- Services ---
+	var logFetcher container.LogFetcher
+	if lf, ok := rt.(container.LogFetcher); ok {
+		logFetcher = lf
+	}
+	a.containerSvc = container.NewService(container.Deps{
+		Store:          store,
+		Logger:         logger,
+		LogFetcher:     logFetcher,
+		RestartChecker: alert.NewRestartDetector(store, logger),
+		Discoverer:     rt,
+	})
+	uptimeCalc := container.NewUptimeCalculator(store)
+
+	a.securitySvc = security.NewService(security.Deps{Logger: logger})
+	a.resourceSvc = resource.NewService(resource.Deps{
+		Store:        resStore,
+		Runtime:      rt,
+		ContainerSvc: a.containerSvc,
+		Logger:       logger,
+	})
+	a.certSvc = certificate.NewService(certificate.Deps{
+		Store:  certStore,
+		Logger: logger,
+	})
+
+	// --- Endpoint monitoring ---
+	a.checkEngine = endpoint.NewCheckEngine(func(endpointID int64, result endpoint.CheckResult) {
+		a.endpointSvc.ProcessCheckResult(ctx, endpointID, result)
+		if len(result.TLSPeerCertificates) > 0 {
+			ep, err := a.endpointSvc.GetEndpoint(ctx, endpointID)
+			if err == nil && ep != nil && certificate.IsHTTPS(ep.Target) {
+				a.certSvc.ProcessAutoDetectedCerts(ctx, endpointID, ep.Target, result.TLSPeerCertificates)
+			}
+		}
+	}, logger)
+	a.endpointSvc = endpoint.NewService(endpoint.Deps{
+		Store:  epStore,
+		Engine: a.checkEngine,
+		Logger: logger,
+	})
+	alertDetector := alert.NewEndpointAlertDetector()
+
+	// --- Heartbeat monitoring ---
+	a.heartbeatSvc = heartbeat.NewService(heartbeat.Deps{
+		Store:   hbStore,
+		Logger:  logger,
+		BaseURL: cfg.BaseURL,
+	})
+
+	// --- SMTP ---
+	var smtpSender *alert.SMTPSender
+	if cfg.SMTP.Host != "" {
+		smtpSender = alert.NewSMTPSender(alert.SMTPConfig{
+			Host:     cfg.SMTP.Host,
+			Port:     cfg.SMTP.Port,
+			Username: cfg.SMTP.Username,
+			Password: cfg.SMTP.Password,
+			From:     cfg.SMTP.From,
+		})
+		logger.Info("SMTP sender configured", "host", cfg.SMTP.Host)
+	}
+
+	// --- Alert engine ---
+	a.notifier = alert.NewNotifier(channelStore, logger)
+	if smtpSender != nil {
+		a.notifier.SetSMTPSender(smtpSender)
+	}
+
+	// --- SSE brokers ---
+	a.broker = v1.NewSSEBroker(logger)
+	a.statusBroker = v1.NewSSEBroker(logger)
+
+	a.alertEngine = alert.NewEngine(alert.EngineDeps{
+		AlertStore:   alertStore,
+		ChannelStore: channelStore,
+		SilenceStore: silenceStore,
+		Logger:       logger,
+		Notifier:     a.notifier,
+		Broadcaster: alert.NewSSEBroadcasterFunc(func(eventType string, data interface{}) {
+			a.broker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+		}),
+	})
+
+	// --- Public Status Page ---
+	a.subscriberSvc = status.NewSubscriberService(subscriberStore, nil, cfg.BaseURL, logger)
+	a.statusSvc = status.NewService(status.Deps{
+		Components:  statusCompStore,
+		Logger:      logger,
+		Incidents:   incidentStore,
+		Maintenance: maintenanceStore,
+		Subscribers: a.subscriberSvc,
+		Broadcaster: func(eventType string, data interface{}) {
+			a.statusBroker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+		},
+	})
+	a.wireStatusProvider()
+	a.maintScheduler = status.NewMaintenanceScheduler(maintenanceStore, statusCompStore, incidentStore, a.statusSvc, logger)
+	a.statusHandler = status.NewHandler(a.statusSvc, a.statusBroker, logger)
+
+	// --- Router ---
+	a.router = v1.NewRouter(a.broker, rt, a.containerSvc, uptimeCalc, a.endpointSvc, a.heartbeatSvc, a.certSvc, a.resourceSvc, logger, v1.AlertOpts{
+		AlertStore:   alertStore,
+		ChannelStore: channelStore,
+		SilenceStore: silenceStore,
+		Notifier:     a.notifier,
+	}, v1.APIConfig{
+		WebhookStore: webhookStore,
+	}, v1.StatusAdminOpts{
+		Components:  statusCompStore,
+		Incidents:   incidentStore,
+		Subscribers: subscriberStore,
+		Maintenance: maintenanceStore,
+		StatusSvc:   a.statusSvc,
+		Broker:      a.statusBroker,
+	})
+
+	a.router.RegisterLicenseRoutes(a.licenseMgr)
+
+	uptimeDailyStore := sqlite.NewUptimeDailyStore(db)
+	a.router.RegisterUIRoutes(v1.UIConfig{
+		UptimeDaily:      uptimeDailyStore,
+		LogStreamer:       rt,
+		ContainerSvc:     a.containerSvc,
+		ResourceTopSvc:   a.resourceSvc,
+		SparklineFetcher: epStore,
+	})
+
+	// --- Webhook dispatcher ---
+	a.webhookDispatcher = webhook.NewDispatcher(webhookStore, a.notifier, logger)
+
+	// --- Wire alert callbacks ---
+	a.wireAlertCallbacks(alertDetector)
+
+	// --- Update intelligence ---
+	registryClient := update.NewRegistryClient()
+	updateScanner := update.NewScanner(registryClient, updateStore, logger)
+	containerAdapter := update.NewContainerServiceAdapter(a.containerSvc)
+
+	var updateEnricher update.UpdateEnricher
+	if extension.CurrentEdition() == extension.Enterprise {
+		cveClient := update.NewCVEClient(updateStore, logger.With("component", "cve"))
+		changelogResolver := update.NewChangelogResolver(registryClient, logger.With("component", "changelog"))
+		riskEngine := update.NewRiskEngine()
+		ecosystemResolver := update.NewEcosystemResolver(registryClient, logger.With("component", "ecosystem"))
+		updateEnricher = update.NewProEnricher(updateStore, cveClient, changelogResolver, riskEngine, ecosystemResolver, logger.With("component", "enricher"))
+		logger.Info("update enrichment pipeline enabled (Pro)")
+	}
+	a.updateSvc = update.NewService(update.Deps{
+		Store:      updateStore,
+		Scanner:    updateScanner,
+		Containers: containerAdapter,
+		Logger:     logger,
+		Enricher:   updateEnricher,
+	})
+
+	a.wireUpdateCallback()
+	a.router.RegisterUpdateRoutes(a.updateSvc, updateStore, containerAdapter)
+	a.router.RegisterSecurityRoutes(a.securitySvc, a.containerSvc)
+
+	// --- Security posture scoring ---
+	ackStore := sqlite.NewAcknowledgmentStore(db)
+	a.scorer = security.NewScorer(security.ScorerDeps{
+		Certs:     &CertPostureAdapter{CertSvc: a.certSvc},
+		CVEs:      &CVEPostureAdapter{Store: updateStore},
+		Updates:   &UpdatePostureAdapter{Store: updateStore},
+		Security:  a.securitySvc,
+		Acks:      ackStore,
+		Threshold: cfg.SecurityScoreThreshold,
+	})
+
+	if cfg.SecurityScoreThreshold > 0 {
+		logger.Info("security posture threshold configured", "threshold", cfg.SecurityScoreThreshold)
+	}
+	a.wirePostureCallbacks()
+	a.router.RegisterPostureRoutes(a.scorer, a.containerSvc, ackStore)
+
+	// --- Rate limiter ---
+	a.rl = ratelimit.New(10, 20)
+
+	// --- MCP Server ---
+	mcpSvc := &pbmcp.Services{
+		Containers:   a.containerSvc,
+		Endpoints:    a.endpointSvc,
+		Heartbeats:   a.heartbeatSvc,
+		Certificates: a.certSvc,
+		Resources:    a.resourceSvc,
+		Alerts:       alertStore,
+		Updates:      a.updateSvc,
+		Incidents:    extension.NoopIncidentManager{},
+		Maintenance:  extension.NoopMaintenanceScheduler{},
+		Runtime:      rt,
+		LogFetcher:   rt,
+		Version:      cfg.Version,
+		Logger:       logger.With("component", "mcp"),
+	}
+	a.mcpServer = pbmcp.NewServer(mcpSvc)
+
+	// --- Build HTTP server ---
+	a.srv = a.buildHTTPServer()
+
+	return a, nil
+}
+
+// RunMCPStdio runs the MCP server over stdin/stdout, then returns.
+func (a *App) RunMCPStdio(ctx context.Context) error {
+	a.logger.Info("starting MCP server in stdio mode")
+	return a.mcpServer.Run(ctx, &gomcp.StdioTransport{})
+}
+
+// Start begins all background services and the HTTP server.
+// It blocks until ctx is cancelled, then performs graceful shutdown.
+func (a *App) Start(ctx context.Context) error {
+	a.db.StartWriter(ctx)
+
+	if a.licenseMgr != nil {
+		a.licenseMgr.Start(ctx)
+	}
+
+	a.alertEngine.Start(ctx)
+	a.notifier.Start(ctx)
+	a.endpointSvc.Start(ctx)
+	a.heartbeatSvc.StartDeadlineChecker(ctx)
+
+	// Webhook observer
+	webhookObserverCh := make(chan v1.SSEEvent, 64)
+	a.broker.AddObserver(webhookObserverCh)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case evt, ok := <-webhookObserverCh:
+				if !ok {
+					return
+				}
+				a.webhookDispatcher.HandleEvent(ctx, evt.Type, evt.Data)
+			}
+		}
+	}()
+
+	// Startup reconciliation
+	a.reconcile(ctx)
+
+	// Background services
+	go a.rl.Start(ctx)
+	go a.resourceSvc.Start(ctx)
+	go a.certSvc.Start(ctx)
+	go a.maintScheduler.Start(ctx)
+	go a.subscriberSvc.Start(ctx)
+	go a.updateSvc.Start(ctx)
+
+	// Retention cleanup
+	a.startRetentionCleanup(ctx)
+
+	// Event stream
+	a.startEventStream(ctx)
+
+	// HTTP server
+	go func() {
+		a.logger.Info("starting HTTP server", "addr", a.cfg.Addr)
+		if err := a.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			a.logger.Error("HTTP server error", "error", err)
+		}
+	}()
+
+	// Wait for shutdown
+	<-ctx.Done()
+	return a.Shutdown()
+}
+
+// Shutdown performs graceful shutdown of all services.
+func (a *App) Shutdown() error {
+	a.logger.Info("shutting down maintenant")
+
+	a.endpointSvc.Stop()
+	a.logger.Info("endpoint check engine stopped")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := a.srv.Shutdown(shutdownCtx); err != nil {
+		a.logger.Error("HTTP server shutdown error", "error", err)
+	}
+
+	if a.licenseMgr != nil {
+		a.licenseMgr.Stop()
+	}
+
+	a.rt.Close()
+	a.db.Close()
+
+	a.logger.Info("maintenant stopped")
+	return nil
+}
+

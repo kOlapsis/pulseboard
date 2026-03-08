@@ -25,6 +25,13 @@ type AlertCallback func(containerID int64, containerName string, insights []Insi
 // EventCallback is called to broadcast SSE events.
 type EventCallback func(eventType string, data any)
 
+// Deps holds all dependencies for the security Service.
+type Deps struct {
+	Logger        *slog.Logger   // required
+	AlertCallback AlertCallback  // optional — nil-safe
+	EventCallback EventCallback  // optional — nil-safe
+}
+
 // Service manages in-memory security insight state and emits alerts/events on changes.
 type Service struct {
 	mu       sync.RWMutex
@@ -37,11 +44,16 @@ type Service struct {
 }
 
 // NewService creates a new security insight service.
-func NewService(logger *slog.Logger) *Service {
+func NewService(d Deps) *Service {
+	if d.Logger == nil {
+		panic("security.NewService: Logger is required")
+	}
 	return &Service{
 		store:    make(map[int64][]Insight),
 		previous: make(map[int64]map[InsightType]bool),
-		logger:   logger,
+		logger:   d.Logger,
+		onAlert:  d.AlertCallback,
+		onEvent:  d.EventCallback,
 	}
 }
 

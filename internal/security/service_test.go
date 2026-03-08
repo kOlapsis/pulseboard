@@ -25,7 +25,7 @@ func testLogger() *slog.Logger {
 }
 
 func TestService_NewInsights_TriggersAlert(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	var alertCalled bool
 	var alertInsights []Insight
@@ -49,7 +49,7 @@ func TestService_NewInsights_TriggersAlert(t *testing.T) {
 }
 
 func TestService_UnchangedInsights_NoDuplicateAlert(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	alertCount := 0
 	svc.SetAlertCallback(func(containerID int64, containerName string, insights []Insight, isRecover bool) {
@@ -67,7 +67,7 @@ func TestService_UnchangedInsights_NoDuplicateAlert(t *testing.T) {
 }
 
 func TestService_FullResolution_TriggersRecovery(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	var lastIsRecover bool
 	alertCount := 0
@@ -90,7 +90,7 @@ func TestService_FullResolution_TriggersRecovery(t *testing.T) {
 }
 
 func TestService_PartialResolution_NoRecovery(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	alertCount := 0
 	var lastIsRecover bool
@@ -118,7 +118,7 @@ func TestService_PartialResolution_NoRecovery(t *testing.T) {
 }
 
 func TestService_NewInsightAdded_TriggersUpdate(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	alertCount := 0
 	svc.SetAlertCallback(func(containerID int64, containerName string, insights []Insight, isRecover bool) {
@@ -140,7 +140,7 @@ func TestService_NewInsightAdded_TriggersUpdate(t *testing.T) {
 }
 
 func TestService_SSEEvents(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	var events []string
 	svc.SetEventCallback(func(eventType string, data any) {
@@ -160,7 +160,7 @@ func TestService_SSEEvents(t *testing.T) {
 }
 
 func TestService_GetContainerInsights(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	insights := []Insight{
 		{Type: PortExposedAllInterfaces, Severity: SeverityCritical, ContainerID: 1, ContainerName: "test"},
@@ -175,7 +175,7 @@ func TestService_GetContainerInsights(t *testing.T) {
 }
 
 func TestService_GetContainerInsights_NoInsights(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	ci := svc.GetContainerInsights(99)
 	assert.Equal(t, 0, ci.Count)
@@ -183,7 +183,7 @@ func TestService_GetContainerInsights_NoInsights(t *testing.T) {
 }
 
 func TestService_GetSummary(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	svc.UpdateContainer(1, "c1", []Insight{
 		{Type: PortExposedAllInterfaces, Severity: SeverityCritical, ContainerID: 1, ContainerName: "c1"},
@@ -201,7 +201,7 @@ func TestService_GetSummary(t *testing.T) {
 }
 
 func TestService_InsightCount(t *testing.T) {
-	svc := NewService(testLogger())
+	svc := NewService(Deps{Logger: testLogger()})
 
 	svc.UpdateContainer(1, "test", []Insight{
 		{Type: PortExposedAllInterfaces, Severity: SeverityCritical, ContainerID: 1, ContainerName: "test"},

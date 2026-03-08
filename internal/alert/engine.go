@@ -38,6 +38,16 @@ type SSEBroadcaster interface {
 	Broadcast(eventType string, data interface{})
 }
 
+// EngineDeps holds all dependencies for the alert Engine.
+type EngineDeps struct {
+	AlertStore   AlertStore   // required
+	ChannelStore ChannelStore // required
+	SilenceStore SilenceStore // required
+	Logger       *slog.Logger // required
+	Notifier     *Notifier      // optional — nil-safe
+	Broadcaster  SSEBroadcaster // optional — nil-safe
+}
+
 // Engine consumes alert events from monitoring services, persists them,
 // evaluates silence rules, dispatches notifications, and broadcasts via SSE.
 type Engine struct {
@@ -60,13 +70,27 @@ type Engine struct {
 }
 
 // NewEngine creates a new alert engine.
-func NewEngine(alertStore AlertStore, channelStore ChannelStore, silenceStore SilenceStore, logger *slog.Logger) *Engine {
+func NewEngine(d EngineDeps) *Engine {
+	if d.AlertStore == nil {
+		panic("alert.NewEngine: AlertStore is required")
+	}
+	if d.ChannelStore == nil {
+		panic("alert.NewEngine: ChannelStore is required")
+	}
+	if d.SilenceStore == nil {
+		panic("alert.NewEngine: SilenceStore is required")
+	}
+	if d.Logger == nil {
+		panic("alert.NewEngine: Logger is required")
+	}
 	return &Engine{
 		eventCh:      make(chan Event, engineChannelBuffer),
-		alertStore:   alertStore,
-		channelStore: channelStore,
-		silenceStore: silenceStore,
-		logger:       logger,
+		alertStore:   d.AlertStore,
+		channelStore: d.ChannelStore,
+		silenceStore: d.SilenceStore,
+		notifier:     d.Notifier,
+		broadcaster:  d.Broadcaster,
+		logger:       d.Logger,
 		escalator:    noopEscalator{},
 		entityRouter: noopEntityRouter{},
 		suppressor:   noopSuppressor{},

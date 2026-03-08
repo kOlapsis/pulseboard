@@ -51,6 +51,16 @@ type RestartChecker interface {
 // EventCallback is called when a container event occurs (for SSE broadcasting).
 type EventCallback func(eventType string, data interface{})
 
+// Deps holds all dependencies for the container Service.
+type Deps struct {
+	Store          ContainerStore   // required
+	Logger         *slog.Logger     // required
+	EventCallback  EventCallback    // optional — nil-safe
+	LogFetcher     LogFetcher       // optional — nil-safe
+	RestartChecker RestartChecker   // optional — nil-safe
+	Discoverer     RuntimeDiscoverer // optional — nil-safe
+}
+
 // Service orchestrates container discovery, event processing, and persistence.
 type Service struct {
 	store          ContainerStore
@@ -61,33 +71,27 @@ type Service struct {
 	discoverer     RuntimeDiscoverer
 }
 
-// NewService creates a new container service.
-func NewService(store ContainerStore, logger *slog.Logger) *Service {
+// NewService creates a new container service with all dependencies.
+func NewService(d Deps) *Service {
+	if d.Store == nil {
+		panic("container.NewService: Store is required")
+	}
+	if d.Logger == nil {
+		panic("container.NewService: Logger is required")
+	}
 	return &Service{
-		store:  store,
-		logger: logger,
+		store:          d.Store,
+		logger:         d.Logger,
+		onEvent:        d.EventCallback,
+		logFetcher:     d.LogFetcher,
+		restartChecker: d.RestartChecker,
+		discoverer:     d.Discoverer,
 	}
 }
 
 // SetEventCallback sets the callback for broadcasting container events.
 func (s *Service) SetEventCallback(cb EventCallback) {
 	s.onEvent = cb
-}
-
-// SetLogFetcher sets the log fetcher for capturing log snippets.
-func (s *Service) SetLogFetcher(lf LogFetcher) {
-	s.logFetcher = lf
-}
-
-// SetRestartChecker sets the restart threshold checker.
-func (s *Service) SetRestartChecker(rc RestartChecker) {
-	s.restartChecker = rc
-}
-
-// SetDiscoverer stores the runtime discoverer so the service can auto-discover
-// containers that start after the initial reconciliation.
-func (s *Service) SetDiscoverer(d RuntimeDiscoverer) {
-	s.discoverer = d
 }
 
 // ProcessEvent handles a single container/workload event.
