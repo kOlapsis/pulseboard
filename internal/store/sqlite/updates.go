@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kolapsis/maintenant/internal/update"
@@ -98,6 +99,7 @@ func (s *UpdateStore) InsertImageUpdate(ctx context.Context, u *update.ImageUpda
 		ON CONFLICT(container_name, image, latest_tag) DO UPDATE SET
 			scan_id=excluded.scan_id,
 			container_id=excluded.container_id,
+			current_tag=excluded.current_tag,
 			current_digest=excluded.current_digest,
 			latest_digest=excluded.latest_digest,
 			update_type=excluded.update_type,
@@ -256,6 +258,28 @@ func (s *UpdateStore) DeleteImageUpdatesByContainer(ctx context.Context, contain
 		return fmt.Errorf("delete image updates by container: %w", err)
 	}
 	return nil
+}
+
+func (s *UpdateStore) DeleteStaleImageUpdates(ctx context.Context, scanID int64, scannedContainerNames []string) (int64, error) {
+	if len(scannedContainerNames) == 0 {
+		return 0, nil
+	}
+	placeholders := make([]string, len(scannedContainerNames))
+	args := make([]interface{}, 0, len(scannedContainerNames)+1)
+	args = append(args, scanID)
+	for i, name := range scannedContainerNames {
+		placeholders[i] = "?"
+		args = append(args, name)
+	}
+	query := fmt.Sprintf(
+		`DELETE FROM image_updates WHERE scan_id != ? AND container_name IN (%s)`,
+		strings.Join(placeholders, ","),
+	)
+	res, err := s.writer.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("delete stale image updates: %w", err)
+	}
+	return res.RowsAffected, nil
 }
 
 // --- CVE cache ---

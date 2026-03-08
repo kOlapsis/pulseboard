@@ -32,6 +32,7 @@ type UpdateStore interface {
 	ListImageUpdates(ctx context.Context, opts ListImageUpdatesOpts) ([]*ImageUpdate, error)
 	GetUpdateSummary(ctx context.Context) (*UpdateSummary, error)
 	DeleteImageUpdatesByContainer(ctx context.Context, containerID string) error
+	DeleteStaleImageUpdates(ctx context.Context, scanID int64, scannedContainerNames []string) (int64, error)
 
 	// Version pins
 	InsertVersionPin(ctx context.Context, p *VersionPin) (int64, error)

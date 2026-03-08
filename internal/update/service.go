@@ -364,6 +364,12 @@ func (s *Service) runScan(ctx context.Context) {
 		containerByID[c.ExternalID] = c
 	}
 
+	// Collect scanned container names for stale update cleanup
+	scannedNames := make([]string, 0, len(containers))
+	for _, c := range containers {
+		scannedNames = append(scannedNames, c.Name)
+	}
+
 	// Persist results
 	updatesFound := 0
 	for _, r := range results {
@@ -422,6 +428,14 @@ func (s *Service) runScan(ctx context.Context) {
 			s.logger.Warn("update enrichment failed", "error", err)
 		}
 		s.logger.Info("enrichment pipeline completed")
+	}
+
+	// Remove stale updates: entries for scanned containers that were not refreshed
+	// by this scan (container was upgraded and no longer has a pending update).
+	if deleted, err := s.store.DeleteStaleImageUpdates(ctx, scanID, scannedNames); err != nil {
+		s.logger.Warn("update scan: cleanup stale updates", "error", err)
+	} else if deleted > 0 {
+		s.logger.Info("update scan: removed stale updates", "deleted", deleted)
 	}
 
 	s.completeScan(ctx, scanRecord, ScanStatusCompleted, len(containers), updatesFound, len(scanErrors))
