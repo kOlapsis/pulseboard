@@ -24,6 +24,13 @@ import { useResourcesStore } from '@/stores/resources'
 import { timeAgo } from '@/utils/time'
 import LogViewer from './LogViewer.vue'
 import ContainerEventTimeline from './ContainerEventTimeline.vue'
+import SecurityInsightList from './SecurityInsightList.vue'
+import PostureScoreBadge from './PostureScoreBadge.vue'
+import PostureCategoryBreakdown from './PostureCategoryBreakdown.vue'
+import { useSecurityStore } from '@/stores/security'
+import { usePostureStore } from '@/stores/posture'
+import { useEdition } from '@/composables/useEdition'
+import type { SecurityScore } from '@/services/postureApi'
 import { getStateStyle, getExitCodeStyle } from '@/utils/containerState'
 import {
   X,
@@ -54,6 +61,40 @@ const activeTab = ref<'logs' | 'info'>('info')
 const deleting = ref(false)
 const confirmingDelete = ref(false)
 const resourcesStore = useResourcesStore()
+const securityStore = useSecurityStore()
+const postureStore = usePostureStore()
+const { hasFeature } = useEdition()
+
+const containerPosture = ref<SecurityScore | null>(null)
+
+const containerInsights = computed(() => {
+  const ci = securityStore.getContainerInsights(props.containerId)
+  return ci?.insights ?? []
+})
+
+const containerAcks = computed(() => postureStore.acknowledgments[props.containerId] ?? [])
+const showAcknowledge = computed(() => hasFeature('security_posture'))
+
+async function handleAcknowledge(insight: { type: string; details: Record<string, unknown> }) {
+  const port = insight.details.port
+  const proto = insight.details.protocol || 'tcp'
+  const key = port ? `${port}/${proto}` : ''
+  await postureStore.acknowledgeRisk({
+    container_id: props.containerId,
+    finding_type: insight.type,
+    finding_key: key,
+    acknowledged_by: 'user',
+    reason: '',
+  })
+  await postureStore.fetchAcknowledgments(props.containerId)
+  containerPosture.value = await postureStore.fetchContainerScore(props.containerId)
+}
+
+async function handleRevoke(ack: { id: number }) {
+  await postureStore.revokeAcknowledgment(ack.id)
+  await postureStore.fetchAcknowledgments(props.containerId)
+  containerPosture.value = await postureStore.fetchContainerScore(props.containerId)
+}
 
 const hasMultipleContainers = computed(() => {
   const names = container.value?.container_names
@@ -104,9 +145,14 @@ async function loadData() {
     const [c, t] = await Promise.all([
       getContainer(props.containerId),
       listTransitions(props.containerId, { limit: 20 }),
+      securityStore.fetchForContainer(props.containerId),
     ])
     container.value = c
     transitions.value = t.transitions || []
+    if (hasFeature('security_posture')) {
+      containerPosture.value = await postureStore.fetchContainerScore(props.containerId)
+      await postureStore.fetchAcknowledgments(props.containerId)
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {
@@ -362,6 +408,26 @@ watch(() => props.containerId, () => {
                 color: container.ready_count === container.pod_count ? 'var(--pb-status-ok)' : 'var(--pb-status-warn)'
               }">{{ container.ready_count }}/{{ container.pod_count }} ready</p>
             </div>
+          </div>
+
+          <!-- Security Insights -->
+          <SecurityInsightList
+            :insights="containerInsights"
+            :acknowledgments="containerAcks"
+            :show-acknowledge="showAcknowledge"
+            @acknowledge="handleAcknowledge"
+            @revoke="handleRevoke"
+          />
+
+          <!-- Security Posture Score -->
+          <div v-if="containerPosture">
+            <div class="mb-3 flex items-center gap-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider" :style="{ color: 'var(--pb-text-muted)' }">
+                Security Score
+              </h3>
+              <PostureScoreBadge :score="containerPosture.score" :color="containerPosture.color" size="sm" />
+            </div>
+            <PostureCategoryBreakdown :categories="containerPosture.categories" />
           </div>
 
           <!-- Event Timeline -->

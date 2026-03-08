@@ -82,17 +82,6 @@ func analyzePortBindings(containerID int64, containerName string, bindings []Por
 			continue
 		}
 
-		insights = append(insights, Insight{
-			Type:          PortExposedAllInterfaces,
-			Severity:      SeverityCritical,
-			ContainerID:   containerID,
-			ContainerName: containerName,
-			Title:         "Port exposed on all interfaces",
-			Description:   fmt.Sprintf("Port %d/%s is bound to 0.0.0.0, making it accessible from any network interface.", b.Port, b.Protocol),
-			Details:       map[string]any{"port": b.Port, "protocol": b.Protocol},
-			DetectedAt:    now,
-		})
-
 		if dbType, ok := knownDatabasePorts[b.Port]; ok {
 			insights = append(insights, Insight{
 				Type:          DatabasePortExposed,
@@ -102,6 +91,17 @@ func analyzePortBindings(containerID int64, containerName string, bindings []Por
 				Title:         "Database port publicly exposed",
 				Description:   fmt.Sprintf("%s port %d is exposed on all interfaces (0.0.0.0).", dbType, b.Port),
 				Details:       map[string]any{"port": b.Port, "protocol": b.Protocol, "database_type": dbType},
+				DetectedAt:    now,
+			})
+		} else {
+			insights = append(insights, Insight{
+				Type:          PortExposedAllInterfaces,
+				Severity:      SeverityCritical,
+				ContainerID:   containerID,
+				ContainerName: containerName,
+				Title:         "Port exposed on all interfaces",
+				Description:   fmt.Sprintf("Port %d/%s is bound to 0.0.0.0, making it accessible from any network interface.", b.Port, b.Protocol),
+				Details:       map[string]any{"port": b.Port, "protocol": b.Protocol},
 				DetectedAt:    now,
 			})
 		}

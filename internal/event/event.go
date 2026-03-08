@@ -94,6 +94,13 @@ const (
 	UpdateUnpinned      = "update.unpinned"
 )
 
+// Security insight events.
+const (
+	SecurityInsightsChanged  = "security.insights_changed"
+	SecurityInsightsResolved = "security.insights_resolved"
+	SecurityPostureChanged   = "security.posture_changed"
+)
+
 // Public status page events.
 const (
 	StatusComponentChanged = "status.component_changed"

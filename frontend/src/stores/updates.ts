@@ -91,8 +91,9 @@ export const useUpdatesStore = defineStore('updates', () => {
       return
     }
     const idx = updates.value.findIndex(u => u.container_id === data.container_id)
-    if (idx >= 0) {
-      updates.value[idx].status = 'pinned'
+    const item = updates.value[idx]
+    if (item) {
+      item.status = 'pinned'
     }
   }
 
@@ -104,8 +105,9 @@ export const useUpdatesStore = defineStore('updates', () => {
       return
     }
     const idx = updates.value.findIndex(u => u.container_id === data.container_id)
-    if (idx >= 0) {
-      updates.value[idx].status = 'available'
+    const item = updates.value[idx]
+    if (item) {
+      item.status = 'available'
     }
   }
 
@@ -220,7 +222,8 @@ export const useUpdatesStore = defineStore('updates', () => {
     try {
       await apiPinVersion(containerId, reason)
       const idx = updates.value.findIndex(u => u.container_id === containerId)
-      if (idx >= 0) updates.value[idx].status = 'pinned'
+      const pinItem = updates.value[idx]
+      if (pinItem) pinItem.status = 'pinned'
       await fetchSummary()
     } catch {
       // ignore
@@ -231,7 +234,8 @@ export const useUpdatesStore = defineStore('updates', () => {
     try {
       await apiUnpinVersion(containerId)
       const idx = updates.value.findIndex(u => u.container_id === containerId)
-      if (idx >= 0) updates.value[idx].status = 'available'
+      const unpinItem = updates.value[idx]
+      if (unpinItem) unpinItem.status = 'available'
       await fetchSummary()
     } catch {
       // ignore

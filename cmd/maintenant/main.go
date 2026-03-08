@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/kolapsis/maintenant/internal/container"
 	"github.com/kolapsis/maintenant/internal/docker"
 	"github.com/kolapsis/maintenant/internal/endpoint"
+	"github.com/kolapsis/maintenant/internal/event"
 	"github.com/kolapsis/maintenant/internal/extension"
 	"github.com/kolapsis/maintenant/internal/heartbeat"
 	_ "github.com/kolapsis/maintenant/internal/kubernetes"
@@ -39,6 +41,7 @@ import (
 	mcpoauth "github.com/kolapsis/maintenant/internal/mcp/oauth"
 	"github.com/kolapsis/maintenant/internal/ratelimit"
 	"github.com/kolapsis/maintenant/internal/resource"
+	"github.com/kolapsis/maintenant/internal/security"
 	pbruntime "github.com/kolapsis/maintenant/internal/runtime"
 	"github.com/kolapsis/maintenant/internal/status"
 	"github.com/kolapsis/maintenant/internal/store/sqlite"
@@ -165,6 +168,9 @@ func main() {
 	svc.SetRestartChecker(alert.NewRestartDetector(store, logger))
 	svc.SetDiscoverer(rt)
 	uptimeCalc := container.NewUptimeCalculator(store)
+
+	// --- Security insights ---
+	securitySvc := security.NewService(logger)
 
 	// --- Resource monitoring ---
 	resSvc := resource.NewService(resStore, rt, svc, logger)
@@ -696,6 +702,43 @@ func main() {
 		}
 	})
 
+	// Security insight alert and SSE callbacks
+	securitySvc.SetAlertCallback(func(containerID int64, containerName string, insights []security.Insight, isRecover bool) {
+		if isRecover {
+			sendAlert(alert.Event{
+				Source:     alert.SourceSecurity,
+				AlertType:  alert.AlertTypeDangerousConfig,
+				Severity:   alert.SeverityInfo,
+				IsRecover:  true,
+				Message:    fmt.Sprintf("All security issues resolved for container %s", containerName),
+				EntityType: "container",
+				EntityID:   containerID,
+				EntityName: containerName,
+				Details:    map[string]any{},
+				Timestamp:  time.Now(),
+			})
+			return
+		}
+		hs := security.HighestSeverity(insights)
+		sendAlert(alert.Event{
+			Source:     alert.SourceSecurity,
+			AlertType:  alert.AlertTypeDangerousConfig,
+			Severity:   mapSecuritySeverity(hs),
+			Message:    security.FormatAlertMessage(insights),
+			EntityType: "container",
+			EntityID:   containerID,
+			EntityName: containerName,
+			Details: map[string]any{
+				"insight_count":    fmt.Sprintf("%d", len(insights)),
+				"highest_severity": hs,
+			},
+			Timestamp: time.Now(),
+		})
+	})
+	securitySvc.SetEventCallback(func(eventType string, data any) {
+		broker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+	})
+
 	// --- Rate limiter for public routes ---
 	rl := ratelimit.New(10, 20) // 10 req/s per IP, burst 20
 	go rl.Start(ctx)
@@ -793,14 +836,42 @@ func main() {
 		}
 	}
 
-	// Discover endpoint labels from all containers (Docker-specific: uses DiscoverAllWithLabels)
+	// Discover endpoint labels and security insights from all containers (Docker-specific)
 	if dr, ok := rt.(*docker.Runtime); ok {
 		logger.Info("syncing endpoint labels from discovered containers")
 		if results, err := dr.DiscoverAllWithLabels(ctx); err == nil {
+			// Build ExternalID → DB ID lookup from reconciled containers
+			dbContainers, _ := svc.ListContainers(ctx, container.ListContainersOpts{IncludeIgnored: true})
+			dbByExtID := make(map[string]*container.Container, len(dbContainers))
+			for _, c := range dbContainers {
+				dbByExtID[c.ExternalID] = c
+			}
+
+			now := time.Now()
 			for _, r := range results {
 				epSvc.SyncEndpoints(ctx, r.Container.Name, r.Container.ExternalID, r.Labels,
 					r.Container.OrchestrationGroup, r.Container.OrchestrationUnit)
 				certSvc.SyncFromLabels(ctx, r.Container.ExternalID, r.Labels)
+
+				// Security insight analysis — resolve DB ID from reconciled containers
+				dbC := dbByExtID[r.Container.ExternalID]
+				if r.SecurityConfig != nil && dbC != nil && dbC.ID > 0 {
+					bindings := make([]security.PortBinding, 0, len(r.SecurityConfig.PortBindings))
+					for _, pb := range r.SecurityConfig.PortBindings {
+						bindings = append(bindings, security.PortBinding{
+							HostIP:   pb.HostIP,
+							HostPort: pb.HostPort,
+							Port:     pb.ContainerPort,
+							Protocol: pb.Protocol,
+						})
+					}
+					insights := security.AnalyzeDocker(dbC.ID, dbC.Name, security.DockerSecurityConfig{
+						Privileged:  r.SecurityConfig.Privileged,
+						NetworkMode: r.SecurityConfig.NetworkMode,
+						Bindings:    bindings,
+					}, now)
+					securitySvc.UpdateContainer(dbC.ID, dbC.Name, insights)
+				}
 			}
 			logger.Info("endpoint discovery complete", "active_checks", checkEngine.ActiveCount())
 		} else {
@@ -834,6 +905,11 @@ func main() {
 					evt.Labels["com.docker.compose.project"],
 					evt.Labels["com.docker.compose.service"])
 				certSvc.SyncFromLabels(ctx, evt.ExternalID, evt.Labels)
+
+				// Re-scan security insights for this container
+				if dr, ok := rt.(*docker.Runtime); ok {
+					go scanContainerSecurity(ctx, dr, svc, securitySvc, evt.ExternalID, logger)
+				}
 			case "stop", "die", "kill":
 				epSvc.HandleContainerStop(ctx, evt.ExternalID)
 			case "destroy":
@@ -860,7 +936,108 @@ func main() {
 		logger.Info("update enrichment pipeline enabled (Pro)")
 	}
 
-	router.RegisterUpdateRoutes(updateSvc, updateStore)
+	updateSvc.SetEventCallback(func(eventType string, data interface{}) {
+		broker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+
+		if eventType == event.UpdateDetected {
+			if m, ok := data.(map[string]interface{}); ok {
+				severity := alert.SeverityInfo
+				if rs, ok := m["risk_score"].(int); ok {
+					if rs >= 81 {
+						severity = alert.SeverityCritical
+					} else if rs >= 61 {
+						severity = alert.SeverityWarning
+					}
+				}
+
+				details := map[string]any{
+					"image":       m["image"],
+					"current_tag": m["current_tag"],
+					"latest_tag":  m["latest_tag"],
+					"update_type": m["update_type"],
+				}
+
+				if extension.CurrentEdition() == extension.Enterprise {
+					if cmd, ok := m["update_command"]; ok {
+						details["update_command"] = cmd
+					}
+					if cmd, ok := m["rollback_command"]; ok {
+						details["rollback_command"] = cmd
+					}
+					if url, ok := m["changelog_url"]; ok {
+						details["changelog_url"] = url
+					}
+					if bc, ok := m["has_breaking_changes"]; ok {
+						details["has_breaking_changes"] = bc
+					}
+				}
+
+				containerName, _ := m["container_name"].(string)
+				latestTag, _ := m["latest_tag"].(string)
+				sendAlert(alert.Event{
+					Source:     "update",
+					AlertType:  "update_available",
+					Severity:   severity,
+					Message:    fmt.Sprintf("Update available for %s: %s", containerName, latestTag),
+					EntityType: "container",
+					EntityName: containerName,
+					Details:    details,
+					Timestamp:  time.Now(),
+				})
+			}
+		}
+	})
+
+	router.RegisterUpdateRoutes(updateSvc, updateStore, containerAdapter)
+	router.RegisterSecurityRoutes(securitySvc, svc)
+
+	// --- Security posture scoring (Enterprise) ---
+	ackStore := sqlite.NewAcknowledgmentStore(db)
+	certPostureAdapter := &certPostureReaderAdapter{certSvc: certSvc}
+	cvePostureAdapter := &cvePostureReaderAdapter{store: updateStore}
+	updatePostureAdapter := &updatePostureReaderAdapter{store: updateStore}
+	scorer := security.NewScorer(certPostureAdapter, cvePostureAdapter, updatePostureAdapter, securitySvc, ackStore)
+
+	// Posture threshold alerting
+	if thresholdStr := os.Getenv("MAINTENANT_SECURITY_SCORE_THRESHOLD"); thresholdStr != "" {
+		if threshold, err := strconv.Atoi(thresholdStr); err == nil && threshold > 0 {
+			scorer.SetThreshold(threshold)
+			logger.Info("security posture threshold configured", "threshold", threshold)
+		}
+	}
+	scorer.SetPostureAlertCallback(func(score int, previousScore int, color string, isBreach bool) {
+		severity := alert.SeverityWarning
+		if score < scorer.Threshold()-20 {
+			severity = alert.SeverityCritical
+		}
+		msg := fmt.Sprintf("Infrastructure security score dropped to %d (threshold: %d)", score, scorer.Threshold())
+		if !isBreach {
+			severity = alert.SeverityInfo
+			msg = fmt.Sprintf("Infrastructure security score recovered to %d (threshold: %d)", score, scorer.Threshold())
+		}
+		sendAlert(alert.Event{
+			Source:     alert.SourceSecurity,
+			AlertType:  alert.AlertTypePostureThreshold,
+			Severity:   severity,
+			IsRecover:  !isBreach,
+			Message:    msg,
+			EntityType: "infrastructure",
+			EntityID:   0,
+			EntityName: "infrastructure",
+			Details: map[string]any{
+				"score":          score,
+				"previous_score": previousScore,
+				"color":          color,
+			},
+			Timestamp: time.Now(),
+		})
+	})
+	scorer.SetPostureEventCallback(func(eventType string, data any) {
+		broker.Broadcast(v1.SSEEvent{Type: eventType, Data: data})
+	})
+
+	router.RegisterPostureRoutes(scorer, svc, ackStore)
+
 	go updateSvc.Start(ctx)
 
 	// --- MCP Server ---
@@ -1003,6 +1180,140 @@ func toString(v interface{}) string {
 		return s
 	}
 	return fmt.Sprintf("%v", v)
+}
+
+// scanContainerSecurity inspects a single container and updates its security insights.
+func scanContainerSecurity(ctx context.Context, dr *docker.Runtime, containerSvc *container.Service, secSvc *security.Service, externalID string, logger *slog.Logger) {
+	results, err := dr.DiscoverAllWithLabels(ctx)
+	if err != nil {
+		logger.Warn("security: failed to scan container", "external_id", externalID, "error", err)
+		return
+	}
+
+	now := time.Now()
+	for _, r := range results {
+		if r.Container.ExternalID != externalID || r.SecurityConfig == nil {
+			continue
+		}
+		c, err := containerSvc.GetContainer(ctx, r.Container.ID)
+		if err != nil || c == nil {
+			// Container may not be in DB yet after reconciliation; try by external ID
+			stored, _ := containerSvc.ListContainers(ctx, container.ListContainersOpts{IncludeIgnored: true})
+			for _, sc := range stored {
+				if sc.ExternalID == externalID {
+					c = sc
+					break
+				}
+			}
+		}
+		if c == nil {
+			return
+		}
+
+		bindings := make([]security.PortBinding, 0, len(r.SecurityConfig.PortBindings))
+		for _, pb := range r.SecurityConfig.PortBindings {
+			bindings = append(bindings, security.PortBinding{
+				HostIP:   pb.HostIP,
+				HostPort: pb.HostPort,
+				Port:     pb.ContainerPort,
+				Protocol: pb.Protocol,
+			})
+		}
+		insights := security.AnalyzeDocker(c.ID, c.Name, security.DockerSecurityConfig{
+			Privileged:  r.SecurityConfig.Privileged,
+			NetworkMode: r.SecurityConfig.NetworkMode,
+			Bindings:    bindings,
+		}, now)
+		secSvc.UpdateContainer(c.ID, c.Name, insights)
+		return
+	}
+}
+
+// --- Posture reader adapters ---
+
+// certPostureReaderAdapter adapts the certificate service for posture scoring.
+type certPostureReaderAdapter struct {
+	certSvc *certificate.Service
+}
+
+func (a *certPostureReaderAdapter) ListCertificatesForContainer(ctx context.Context, containerExternalID string) ([]security.CertificateInfo, error) {
+	monitors, err := a.certSvc.ListMonitors(ctx, certificate.ListCertificatesOpts{})
+	if err != nil {
+		return nil, fmt.Errorf("list cert monitors: %w", err)
+	}
+
+	var result []security.CertificateInfo
+	for _, m := range monitors {
+		if !m.Active || m.ExternalID != containerExternalID {
+			continue
+		}
+		info := security.CertificateInfo{
+			Status: string(m.Status),
+		}
+		cr, err := a.certSvc.GetLatestCheckResult(ctx, m.ID)
+		if err == nil && cr != nil {
+			info.DaysRemaining = cr.DaysRemaining()
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
+// cvePostureReaderAdapter adapts the update store for CVE scoring.
+type cvePostureReaderAdapter struct {
+	store update.UpdateStore
+}
+
+func (a *cvePostureReaderAdapter) ListCVEsForContainer(ctx context.Context, containerExternalID string) ([]security.CVEInfo, error) {
+	cves, err := a.store.ListContainerCVEs(ctx, containerExternalID)
+	if err != nil {
+		return nil, fmt.Errorf("list container cves: %w", err)
+	}
+	result := make([]security.CVEInfo, len(cves))
+	for i, c := range cves {
+		result[i] = security.CVEInfo{
+			CVEID:    c.CVEID,
+			Severity: string(c.Severity),
+		}
+	}
+	return result, nil
+}
+
+// updatePostureReaderAdapter adapts the update store for update/image-age scoring.
+type updatePostureReaderAdapter struct {
+	store update.UpdateStore
+}
+
+func (a *updatePostureReaderAdapter) ListUpdatesForContainer(ctx context.Context, containerExternalID string) ([]security.UpdateInfo, error) {
+	updates, err := a.store.ListImageUpdates(ctx, update.ListImageUpdatesOpts{})
+	if err != nil {
+		return nil, fmt.Errorf("list image updates: %w", err)
+	}
+	var result []security.UpdateInfo
+	for _, u := range updates {
+		if u.ContainerID != containerExternalID {
+			continue
+		}
+		result = append(result, security.UpdateInfo{
+			UpdateType:  string(u.UpdateType),
+			PublishedAt: u.PublishedAt,
+		})
+	}
+	return result, nil
+}
+
+// mapSecuritySeverity maps security insight severity to alert severity.
+func mapSecuritySeverity(s string) string {
+	switch s {
+	case security.SeverityCritical:
+		return alert.SeverityCritical
+	case security.SeverityHigh:
+		return alert.SeverityWarning
+	case security.SeverityMedium:
+		return alert.SeverityInfo
+	default:
+		return alert.SeverityInfo
+	}
 }
 
 // spaHandler returns an http.Handler that serves the embedded SPA frontend.

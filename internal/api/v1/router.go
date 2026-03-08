@@ -27,6 +27,7 @@ import (
 	"github.com/kolapsis/maintenant/internal/heartbeat"
 	"github.com/kolapsis/maintenant/internal/license"
 	"github.com/kolapsis/maintenant/internal/resource"
+	"github.com/kolapsis/maintenant/internal/security"
 	pbruntime "github.com/kolapsis/maintenant/internal/runtime"
 	"github.com/kolapsis/maintenant/internal/status"
 	"github.com/kolapsis/maintenant/internal/update"
@@ -118,10 +119,11 @@ func SetOrganisationName(name string) { organisationName = name }
 
 // Router sets up the /api/v1 route group.
 type Router struct {
-	mux     *http.ServeMux
-	broker  *SSEBroker
-	logger  *slog.Logger
-	runtime pbruntime.Runtime
+	mux              *http.ServeMux
+	broker           *SSEBroker
+	logger           *slog.Logger
+	runtime          pbruntime.Runtime
+	containerHandler *ContainerHandler
 }
 
 // RegisterUIRoutes registers UI redesign endpoints (daily uptime, log streaming, top resources).
@@ -167,6 +169,7 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	ch := NewContainerHandler(svc, uptime)
+	r.containerHandler = ch
 	if cl, ok := rt.(ContainerNameLister); ok {
 		ch.SetContainerNameLister(cl)
 	}
@@ -382,12 +385,12 @@ func (r *Router) RegisterLicenseRoutes(mgr *license.LicenseManager) {
 }
 
 // RegisterUpdateRoutes registers update intelligence endpoints.
-func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore update.UpdateStore) {
+func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore update.UpdateStore, containers ContainerInfoProvider) {
 	if updateSvc == nil {
 		return
 	}
 
-	uh := NewUpdateHandler(updateSvc, updateStore)
+	uh := NewUpdateHandler(updateSvc, updateStore, containers)
 	r.mux.HandleFunc("GET /api/v1/updates", uh.HandleListUpdates)
 	r.mux.HandleFunc("GET /api/v1/updates/summary", uh.HandleGetUpdateSummary)
 	r.mux.HandleFunc("GET /api/v1/updates/dry-run", uh.HandleGetDryRun)
@@ -415,6 +418,34 @@ func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore upd
 	updateSvc.SetEventCallback(func(eventType string, data interface{}) {
 		r.broker.Broadcast(SSEEvent{Type: eventType, Data: data})
 	})
+}
+
+// RegisterSecurityRoutes registers security insight endpoints.
+func (r *Router) RegisterSecurityRoutes(secSvc *security.Service, containerSvc *container.Service) {
+	sh := NewSecurityHandler(secSvc, containerSvc)
+	r.mux.HandleFunc("GET /api/v1/security/insights", sh.HandleListInsights)
+	r.mux.HandleFunc("GET /api/v1/security/insights/{container_id}", sh.HandleGetContainerInsights)
+	r.mux.HandleFunc("GET /api/v1/security/summary", sh.HandleGetSummary)
+
+	// Wire security provider into container handler for enriched list responses
+	if r.containerHandler != nil {
+		r.containerHandler.SetSecurityProvider(secSvc)
+	}
+}
+
+// RegisterPostureRoutes registers security posture endpoints (Enterprise-only).
+func (r *Router) RegisterPostureRoutes(scorer *security.Scorer, containerSvc *container.Service, ackStore security.AcknowledgmentStore) {
+	ph := NewPostureHandler(scorer, containerSvc, ackStore)
+
+	// Posture endpoints
+	r.mux.HandleFunc("GET /api/v1/security/posture", requireEnterprise(ph.HandleGetPosture))
+	r.mux.HandleFunc("GET /api/v1/security/posture/containers", requireEnterprise(ph.HandleListContainerPostures))
+	r.mux.HandleFunc("GET /api/v1/security/posture/containers/{container_id}", requireEnterprise(ph.HandleGetContainerPosture))
+
+	// Acknowledgment endpoints
+	r.mux.HandleFunc("POST /api/v1/security/acknowledgments", requireEnterprise(ph.HandleCreateAcknowledgment))
+	r.mux.HandleFunc("GET /api/v1/security/acknowledgments", requireEnterprise(ph.HandleListAcknowledgments))
+	r.mux.HandleFunc("DELETE /api/v1/security/acknowledgments/{id}", requireEnterprise(ph.HandleDeleteAcknowledgment))
 }
 
 // Handler returns the HTTP handler with CORS and body size limit middleware applied.
@@ -512,6 +543,7 @@ func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 				"alert_routing":       true,
 				"alert_entity_routing": isEnterprise,
 				"alert_templates":     isEnterprise,
+				"security_posture":    isEnterprise,
 			},
 		})
 	}

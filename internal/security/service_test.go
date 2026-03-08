@@ -220,13 +220,13 @@ func TestService_InsightCount(t *testing.T) {
 func TestFormatAlertMessage(t *testing.T) {
 	insights := []Insight{
 		{Type: PrivilegedContainer, Title: "Privileged container", Details: map[string]any{}},
-		{Type: PortExposedAllInterfaces, Title: "Port exposed on all interfaces", Details: map[string]any{"port": 6379, "protocol": "tcp"}},
+		{Type: PortExposedAllInterfaces, Title: "Port exposed on all interfaces", Details: map[string]any{"port": 8080, "protocol": "tcp"}},
 		{Type: DatabasePortExposed, Title: "Database port publicly exposed", Details: map[string]any{"port": 6379, "database_type": "Redis"}},
 	}
 
 	msg := FormatAlertMessage(insights)
 	assert.Contains(t, msg, "3 security issue(s) detected")
 	assert.Contains(t, msg, "Privileged container")
-	assert.Contains(t, msg, "Port exposed on all interfaces (6379/tcp)")
+	assert.Contains(t, msg, "Port exposed on all interfaces (8080/tcp)")
 	assert.Contains(t, msg, "Database port publicly exposed (Redis 6379)")
 }

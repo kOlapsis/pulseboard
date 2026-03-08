@@ -104,11 +104,10 @@ func TestAnalyzeDocker_DatabasePortExposed(t *testing.T) {
 
 			insights := AnalyzeDocker(1, "test-db", cfg, testNow)
 
-			// Should have both PortExposedAllInterfaces AND DatabasePortExposed
-			require.Len(t, insights, 2)
-			assert.Equal(t, PortExposedAllInterfaces, insights[0].Type)
-			assert.Equal(t, DatabasePortExposed, insights[1].Type)
-			assert.Equal(t, tt.dbType, insights[1].Details["database_type"])
+			// Should have only DatabasePortExposed (not both)
+			require.Len(t, insights, 1)
+			assert.Equal(t, DatabasePortExposed, insights[0].Type)
+			assert.Equal(t, tt.dbType, insights[0].Details["database_type"])
 		})
 	}
 }
@@ -176,14 +175,13 @@ func TestAnalyzeDocker_MultipleIssues(t *testing.T) {
 
 	insights := AnalyzeDocker(1, "test-container", cfg, testNow)
 
-	// PortExposedAllInterfaces + DatabasePortExposed + PrivilegedContainer
-	require.Len(t, insights, 3)
+	// DatabasePortExposed + PrivilegedContainer (not PortExposedAllInterfaces for DB ports)
+	require.Len(t, insights, 2)
 
 	types := make(map[InsightType]bool)
 	for _, i := range insights {
 		types[i.Type] = true
 	}
-	assert.True(t, types[PortExposedAllInterfaces])
 	assert.True(t, types[DatabasePortExposed])
 	assert.True(t, types[PrivilegedContainer])
 }

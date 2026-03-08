@@ -21,6 +21,7 @@ import {
   Link,
   Menu,
   Shield,
+  ShieldCheck,
   X,
 } from 'lucide-vue-next'
 
@@ -45,6 +46,7 @@ const mainNav = [
   { to: '/heartbeats', label: 'Heartbeats', icon: Heart },
   { to: '/certificates', label: 'SSL Certificates', icon: Shield },
   { to: '/updates', label: 'Updates', icon: ArrowUpCircle },
+  { to: '/posture', label: 'Security Posture', icon: ShieldCheck },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/webhooks', label: 'Webhooks', icon: Link },
   { to: '/status-admin', label: 'Status Pages', icon: Activity },

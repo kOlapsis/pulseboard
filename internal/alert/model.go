@@ -23,6 +23,13 @@ const (
 	SourceHeartbeat   = "heartbeat"
 	SourceCertificate = "certificate"
 	SourceResource    = "resource"
+	SourceSecurity    = "security"
+)
+
+// Security alert types.
+const (
+	AlertTypeDangerousConfig  = "dangerous_configuration"
+	AlertTypePostureThreshold = "posture_threshold"
 )
 
 // Alert statuses.

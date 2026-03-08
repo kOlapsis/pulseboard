@@ -15,10 +15,14 @@
 import type {Container} from '@/services/containerApi'
 import {useResourcesStore} from '@/stores/resources'
 import {useUpdatesStore} from '@/stores/updates'
+import {usePostureStore} from '@/stores/posture'
+import {useEdition} from '@/composables/useEdition'
 import {timeAgo} from '@/utils/time'
 import {getStateStyle as getStateStyleFromUtil} from '@/utils/containerState'
 import UpdateBadge from '@/components/UpdateBadge.vue'
-import {computed} from 'vue'
+import SecurityInsightBadge from '@/components/SecurityInsightBadge.vue'
+import PostureScoreBadge from '@/components/PostureScoreBadge.vue'
+import {computed, onMounted, ref} from 'vue'
 
 const props = defineProps<{
   container: Container
@@ -30,9 +34,22 @@ const emit = defineEmits<{
 
 const resourcesStore = useResourcesStore()
 const updatesStore = useUpdatesStore()
+const postureStore = usePostureStore()
+const { hasFeature } = useEdition()
 
 const metrics = computed(() => resourcesStore.formattedSnapshot(props.container.id))
 const containerUpdate = computed(() => updatesStore.updates.find(u => u.container_id === props.container.external_id) ?? null)
+
+const containerScore = ref<{ score: number; color: string } | null>(null)
+
+onMounted(async () => {
+  if (hasFeature('security_posture')) {
+    const score = await postureStore.fetchContainerScore(props.container.id)
+    if (score) {
+      containerScore.value = { score: score.score, color: score.color }
+    }
+  }
+})
 
 const healthColors: Record<string, string> = {
   healthy: 'var(--pb-status-ok)',
@@ -101,9 +118,19 @@ function getStateStyle(state: string) {
             {{ container.image.split('@')[0] }}
           </p>
           <UpdateBadge :update="containerUpdate" />
+          <SecurityInsightBadge
+            :count="container.security_insight_count ?? 0"
+            :severity="container.security_highest_severity ?? null"
+          />
         </div>
       </div>
-      <div class="ml-2 flex items-center gap-1">
+      <div class="ml-2 flex items-center gap-2">
+        <PostureScoreBadge
+          v-if="containerScore"
+          :score="containerScore.score"
+          :color="containerScore.color"
+          size="sm"
+        />
         <span
           v-if="container.state === 'restarting'"
           class="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium"
