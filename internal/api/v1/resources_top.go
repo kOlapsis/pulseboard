@@ -124,9 +124,6 @@ func (h *ResourceTopHandler) handleRealtimeQuery(w http.ResponseWriter, metric s
 	}
 
 	sort.Slice(entries, func(i, j int) bool {
-		if metric == "memory" {
-			return entries[i].percent > entries[j].percent
-		}
 		return entries[i].value > entries[j].value
 	})
 

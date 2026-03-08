@@ -243,7 +243,7 @@ func (s *ResourceStore) GetTopConsumersByPeriod(ctx context.Context, metric stri
 				`SELECT container_id, CAST(AVG(mem_used) AS REAL) AS avg_val,
 					CASE WHEN AVG(mem_limit) > 0 THEN AVG(mem_used) * 100.0 / AVG(mem_limit) ELSE 0 END AS avg_pct
 				FROM resource_snapshots WHERE timestamp >= %d
-				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
 		}
 	case "24h":
 		from := now.Add(-24 * time.Hour).Unix()
@@ -258,7 +258,7 @@ func (s *ResourceStore) GetTopConsumersByPeriod(ctx context.Context, metric stri
 				`SELECT container_id, CAST(AVG(avg_mem_used) AS REAL) AS avg_val,
 					CASE WHEN AVG(avg_mem_limit) > 0 THEN AVG(avg_mem_used) * 100.0 / AVG(avg_mem_limit) ELSE 0 END AS avg_pct
 				FROM resource_hourly WHERE bucket >= %d
-				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
 		}
 	case "7d", "30d":
 		days := 7
@@ -277,7 +277,7 @@ func (s *ResourceStore) GetTopConsumersByPeriod(ctx context.Context, metric stri
 				`SELECT container_id, CAST(AVG(avg_mem_used) AS REAL) AS avg_val,
 					CASE WHEN AVG(avg_mem_limit) > 0 THEN AVG(avg_mem_used) * 100.0 / AVG(avg_mem_limit) ELSE 0 END AS avg_pct
 				FROM resource_daily WHERE bucket >= %d
-				GROUP BY container_id ORDER BY avg_pct DESC LIMIT %d`, from, limit)
+				GROUP BY container_id ORDER BY avg_val DESC LIMIT %d`, from, limit)
 		}
 	default:
 		return nil, fmt.Errorf("invalid period: %s", period)

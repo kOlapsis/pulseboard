@@ -284,7 +284,8 @@ watch(() => props.containerId, () => {
               :style="{ width: memPercent + '%', backgroundColor: barColor(memPercent) }"
             />
           </div>
-          <span class="tabular-nums font-medium" :style="{ color: 'var(--pb-text-secondary)' }">{{ metrics.memPercent }}</span>
+          <span class="tabular-nums font-medium" :style="{ color: 'var(--pb-text-secondary)' }">{{ metrics.memUsed }}<template v-if="metrics.memLimit !== '0 B'"> / {{ metrics.memLimit }}</template></span>
+          <span class="tabular-nums" :style="{ color: 'var(--pb-text-muted)' }">{{ metrics.memPercent }}</span>
         </div>
         <!-- Net/IO -->
         <div class="ml-auto flex gap-3 text-xs" :style="{ color: 'var(--pb-text-muted)' }">
