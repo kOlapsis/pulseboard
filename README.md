@@ -33,6 +33,7 @@ Most self-hosters juggle 3-5 tools to monitor their stack: one for containers, o
 | SSL certificate tracking     | **Yes**    | Yes         | No         | No         |
 | CPU/memory/network metrics   | **Yes**    | No          | Limited    | No         |
 | Image update detection       | **Yes**    | No          | Yes        | No         |
+| Network security insights    | **Yes**    | No          | No         | No         |
 | Public status page           | **Yes**    | Yes         | No         | No         |
 | Alerting (webhook, Discord)  | **Yes**    | Yes         | Limited    | No         |
 | Kubernetes native            | **Yes**    | No          | Yes        | No         |
@@ -161,9 +162,13 @@ Automatic detection from your HTTPS endpoints, plus standalone monitors for any 
 
 Real-time CPU, memory, network I/O, and disk I/O per container. Historical charts from 1 hour to 30 days (Pro). Per-container alert thresholds with debounce to avoid noise. Top consumers view for instant triage.
 
+### Network Security Insights
+
+Automatic detection of dangerous network configurations across your containers. Flags ports binding to `0.0.0.0`, exposed database ports, host-network mode, privileged containers, and Kubernetes-specific risks (NodePort, LoadBalancer without NetworkPolicy). Each container image is mapped to its software ecosystem via OCI manifest inspection for CVE-relevant context.
+
 ### Update Intelligence
 
-Knows when your images have updates available. Scans OCI registries, compares digests. Stop running `docker pull` blindly.
+Knows when your images have updates available. Scans OCI registries, compares digests. Compose-aware update and rollback commands with the correct `--project-directory` flag. Stop running `docker pull` blindly.
 
 ### Alert Engine
 
@@ -371,6 +376,7 @@ Full REST API under `/api/v1/` for automation and integration.
 | Webhooks     | `GET POST /webhooks` `POST /webhooks/{id}/test`                                                         |
 | Status Page  | `GET POST /status/groups\|components\|incidents\|maintenance`                                           |
 | Updates      | `GET /updates` `POST /updates/scan`                                                                     |
+| Security     | `GET /security/insights` `GET /security/summary` `GET /security/insights/{id}`                          |
 | Events       | `GET /containers/events` *(SSE stream)*                                                                 |
 | Health       | `GET /health`                                                                                           |
 
@@ -401,7 +407,8 @@ Full REST API under `/api/v1/` for automation and integration.
 │   ┌────────────────────────────────────────────┐     │
 │   │  Containers · Endpoints · Heartbeats ·     │     │
 │   │  Certificates · Resources · Alerts ·       │     │
-│   │  Updates · Status Page · Webhooks          │     │
+│   │  Updates · Security · Status Page ·        │     │
+│   │  Webhooks                                  │     │
 │   └────────────────────────────────────────────┘     │
 │                         |                            │
 │   ┌────────────────────────────────────────────┐     │
@@ -431,6 +438,7 @@ maintenant is fully functional out of the box. The **Pro Edition** is available 
 | Heartbeat/cron monitoring | x (10 max) | x (unlimited) |
 | TLS certificate monitoring | x | x |
 | Resource metrics | x | x |
+| Network security insights | x | x |
 | Update intelligence (digest scan) | x | x |
 | Alert engine (fire, recover, silence) | x | x |
 | Webhook + Discord channels | x | x |
@@ -440,7 +448,7 @@ maintenant is fully functional out of the box. The **Pro Edition** is available 
 | Slack, Teams, Email channels | | x |
 | Alert escalation + routing | | x |
 | Maintenance windows | | x |
-| Alert templates | | x |
+| Security posture dashboard | | x |
 | CVE enrichment + risk scoring | | x |
 | Incident management | | x |
 | Subscriber notifications | | x |

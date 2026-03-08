@@ -78,6 +78,14 @@ DELETE /api/v1/updates/exclusions/{id}
 
 ---
 
+## Compose-Aware Commands
+
+When maintenant detects that a container belongs to a Docker Compose project, update and rollback commands automatically include the correct `--project-directory` flag. This ensures commands work reliably even when the compose file lives outside the current working directory.
+
+The compose working directory is extracted from the `com.docker.compose.project.working_dir` label that Docker Compose sets automatically on every container.
+
+---
+
 ## CVE Enrichment & Risk Scoring :material-crown:{ title="Pro" }
 With maintenant Pro, update intelligence goes beyond digest comparison. Each available update is enriched with vulnerability data:
 

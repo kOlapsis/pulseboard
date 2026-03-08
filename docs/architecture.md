@@ -24,7 +24,8 @@
 │   ┌────────────────────────────────────────────┐     │
 │   │  Containers · Endpoints · Heartbeats ·     │     │
 │   │  Certificates · Resources · Alerts ·       │     │
-│   │  Updates · Status Page · Webhooks          │     │
+│   │  Updates · Security · Status Page ·        │     │
+│   │  Webhooks                                  │     │
 │   └────────────────────────────────────────────┘     │
 │                         |                            │
 │   ┌────────────────────────────────────────────┐     │
@@ -104,6 +105,7 @@ internal/                  Private packages
     ratelimit/             Per-IP rate limiting middleware
     resource/              Resource metrics collection
     runtime/               Runtime abstraction interface
+    security/              Network security analysis, posture scoring
     status/                Public status page (handler, subscribers)
     store/sqlite/          SQLite store layer, migrations, writer
     update/                Update intelligence, registry scanning

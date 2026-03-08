@@ -76,6 +76,7 @@ nav:
       - TLS Certificate Monitoring: features/certificates.md
       - Resource Metrics: features/resources.md
       - Update Intelligence: features/updates.md
+      - Network Security Insights: features/security.md
       - Alert Engine: features/alerts.md
       - Public Status Page: features/status-page.md
       - MCP Server: features/mcp.md

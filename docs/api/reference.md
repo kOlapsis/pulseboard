@@ -214,6 +214,27 @@ These routes do not require authentication:
 
 ---
 
+## Security
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/security/insights` | List all network security insights |
+| `GET` | `/api/v1/security/insights/{container_id}` | Get insights for a specific container |
+| `GET` | `/api/v1/security/summary` | Aggregated counts by severity and type |
+
+### Security Posture (Pro)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/security/posture` | Global infrastructure posture score |
+| `GET` | `/api/v1/security/posture/containers` | Per-container posture scores (`?limit=&offset=`) |
+| `GET` | `/api/v1/security/posture/containers/{id}` | Posture score for a single container |
+| `POST` | `/api/v1/security/acknowledgments` | Acknowledge a finding |
+| `DELETE` | `/api/v1/security/acknowledgments/{id}` | Revoke an acknowledgment |
+| `GET` | `/api/v1/security/acknowledgments` | List acknowledgments (`?container_id=`) |
+
+---
+
 ## CVE Intelligence (Pro)
 
 | Method | Endpoint | Description |

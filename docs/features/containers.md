@@ -122,8 +122,17 @@ This is useful for infrastructure containers (reverse proxies, sidecars) that ad
 
 ---
 
+## Security Insights
+
+Each container's detail panel displays network security insights detected by maintenant's analyzer. These include exposed ports binding to `0.0.0.0`, database ports without restriction, host-network mode, and privileged containers.
+
+See [Network Security Insights](security.md) for full details.
+
+---
+
 ## Related
 
 - [Docker Labels Reference](../guides/docker-labels.md) — Full list of container labels
 - [Alert Engine](alerts.md) — Configure alerts for container events
 - [Resource Metrics](resources.md) — CPU, memory, and network metrics per container
+- [Network Security Insights](security.md) — Port exposure and network misconfiguration detection
