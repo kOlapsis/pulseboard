@@ -40,14 +40,16 @@ func (s *ContainerStore) InsertContainer(ctx context.Context, c *container.Conta
 		`INSERT INTO containers (external_id, name, image, state, health_status, has_health_check,
 			orchestration_group, orchestration_unit, custom_group, is_ignored, alert_severity,
 			restart_threshold, alert_channels, archived, first_seen_at, last_state_change_at,
-			runtime_type, error_detail, controller_kind, namespace, pod_count, ready_count)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			runtime_type, error_detail, controller_kind, namespace, pod_count, ready_count,
+			compose_working_dir)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.ExternalID, c.Name, c.Image, string(c.State), nullableHealth(c.HealthStatus),
 		boolToInt(c.HasHealthCheck), NullableString(c.OrchestrationGroup), NullableString(c.OrchestrationUnit),
 		NullableString(c.CustomGroup), boolToInt(c.IsIgnored), string(c.AlertSeverity),
 		c.RestartThreshold, NullableString(c.AlertChannels), boolToInt(c.Archived),
 		c.FirstSeenAt.Unix(), c.LastStateChangeAt.Unix(),
 		c.RuntimeType, c.ErrorDetail, c.ControllerKind, c.Namespace, c.PodCount, c.ReadyCount,
+		c.ComposeWorkingDir,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert container: %w", err)
@@ -61,7 +63,8 @@ func (s *ContainerStore) UpdateContainer(ctx context.Context, c *container.Conta
 		`UPDATE containers SET name=?, image=?, state=?, health_status=?, has_health_check=?,
 			orchestration_group=?, orchestration_unit=?, custom_group=?, is_ignored=?, alert_severity=?,
 			restart_threshold=?, alert_channels=?, archived=?, last_state_change_at=?, archived_at=?,
-			runtime_type=?, error_detail=?, controller_kind=?, namespace=?, pod_count=?, ready_count=?
+			runtime_type=?, error_detail=?, controller_kind=?, namespace=?, pod_count=?, ready_count=?,
+			compose_working_dir=?
 		WHERE id=?`,
 		c.Name, c.Image, string(c.State), nullableHealth(c.HealthStatus),
 		boolToInt(c.HasHealthCheck), NullableString(c.OrchestrationGroup), NullableString(c.OrchestrationUnit),
@@ -69,6 +72,7 @@ func (s *ContainerStore) UpdateContainer(ctx context.Context, c *container.Conta
 		c.RestartThreshold, NullableString(c.AlertChannels), boolToInt(c.Archived),
 		c.LastStateChangeAt.Unix(), nullableTime(c.ArchivedAt),
 		c.RuntimeType, c.ErrorDetail, c.ControllerKind, c.Namespace, c.PodCount, c.ReadyCount,
+		c.ComposeWorkingDir,
 		c.ID,
 	)
 	if err != nil {
@@ -292,7 +296,8 @@ func (s *ContainerStore) DeleteArchivedContainersBefore(ctx context.Context, bef
 const containerColumns = `id, external_id, name, image, state, health_status, has_health_check,
 	orchestration_group, orchestration_unit, custom_group, is_ignored, alert_severity,
 	restart_threshold, alert_channels, archived, first_seen_at, last_state_change_at, archived_at,
-	runtime_type, error_detail, controller_kind, namespace, pod_count, ready_count`
+	runtime_type, error_detail, controller_kind, namespace, pod_count, ready_count,
+	compose_working_dir`
 
 const transitionColumns = `id, container_id, previous_state, new_state, previous_health, new_health, exit_code, log_snippet, timestamp`
 
@@ -315,6 +320,7 @@ func (s *ContainerStore) scanContainer(row rowScanner) (*container.Container, er
 		&c.RestartThreshold, &alertChannels,
 		&archived, &firstSeen, &lastChange, &archivedAt,
 		&c.RuntimeType, &c.ErrorDetail, &c.ControllerKind, &c.Namespace, &c.PodCount, &c.ReadyCount,
+		&c.ComposeWorkingDir,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

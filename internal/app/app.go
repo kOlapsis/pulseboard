@@ -13,6 +13,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,19 +46,19 @@ type App struct {
 	logger *slog.Logger
 
 	// Infrastructure
-	db  *sqlite.DB
-	rt  pbruntime.Runtime
+	db *sqlite.DB
+	rt pbruntime.Runtime
 
 	// Core services
-	containerSvc   *container.Service
-	endpointSvc    *endpoint.Service
-	heartbeatSvc   *heartbeat.Service
-	certSvc        *certificate.Service
-	resourceSvc    *resource.Service
-	securitySvc    *security.Service
-	updateSvc      *update.Service
-	statusSvc      *status.Service
-	subscriberSvc  *status.SubscriberService
+	containerSvc  *container.Service
+	endpointSvc   *endpoint.Service
+	heartbeatSvc  *heartbeat.Service
+	certSvc       *certificate.Service
+	resourceSvc   *resource.Service
+	securitySvc   *security.Service
+	updateSvc     *update.Service
+	statusSvc     *status.Service
+	subscriberSvc *status.SubscriberService
 
 	// Alert pipeline
 	alertEngine *alert.Engine
@@ -71,21 +72,21 @@ type App struct {
 	srv           *http.Server
 
 	// Stores (needed for retention cleanup and reconciliation)
-	alertStore       alert.AlertStore
-	updateStore      update.UpdateStore
-	containerStore   *sqlite.ContainerStore
-	epStore          *sqlite.EndpointStore
-	hbStore          *sqlite.HeartbeatStore
-	certStore        *sqlite.CertificateStore
-	resStore         *sqlite.ResourceStore
+	alertStore     alert.AlertStore
+	updateStore    update.UpdateStore
+	containerStore *sqlite.ContainerStore
+	epStore        *sqlite.EndpointStore
+	hbStore        *sqlite.HeartbeatStore
+	certStore      *sqlite.CertificateStore
+	resStore       *sqlite.ResourceStore
 
 	// Background services
-	checkEngine     *endpoint.CheckEngine
-	maintScheduler  *status.MaintenanceScheduler
-	scorer          *security.Scorer
-	rl              *ratelimit.Limiter
-	licenseMgr      *license.LicenseManager
-	mcpServer       *gomcp.Server
+	checkEngine    *endpoint.CheckEngine
+	maintScheduler *status.MaintenanceScheduler
+	scorer         *security.Scorer
+	rl             *ratelimit.Limiter
+	licenseMgr     *license.LicenseManager
+	mcpServer      *gomcp.Server
 
 	// Webhook
 	webhookDispatcher *webhook.Dispatcher
@@ -113,7 +114,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	a.db = db
 
 	if err := sqlite.Migrate(db.ReadDB(), logger); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
@@ -162,14 +163,14 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	ctx := context.Background()
 	rt, err := pbruntime.Detect(ctx, logger)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("detect container runtime: %w", err)
 	}
 	a.rt = rt
 
 	if err := rt.Connect(ctx); err != nil {
-		rt.Close()
-		db.Close()
+		_ = rt.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("connect to runtime %s: %w", rt.Name(), err)
 	}
 
@@ -281,7 +282,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	updateScanner := update.NewScanner(registryClient, updateStore, logger)
 	containerAdapter := update.NewContainerServiceAdapter(a.containerSvc)
 
-	var updateEnricher update.UpdateEnricher
+	var updateEnricher update.Enricher
 	if extension.CurrentEdition() == extension.Enterprise {
 		cveClient := update.NewCVEClient(updateStore, logger.With("component", "cve"))
 		changelogResolver := update.NewChangelogResolver(registryClient, logger.With("component", "changelog"))
@@ -347,7 +348,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		WebhookStore: webhookStore,
 		// UI extras
 		UptimeDaily:      uptimeDailyStore,
-		LogStreamer:       rt,
+		LogStreamer:      rt,
 		ResourceTopSvc:   a.resourceSvc,
 		SparklineFetcher: epStore,
 		// Update intelligence
@@ -401,7 +402,7 @@ func (a *App) RunMCPStdio(ctx context.Context) error {
 }
 
 // Start begins all background services and the HTTP server.
-// It blocks until ctx is cancelled, then performs graceful shutdown.
+// It blocks until ctx is canceled, then performs a graceful shutdown.
 func (a *App) Start(ctx context.Context) error {
 	a.db.StartWriter(ctx)
 
@@ -451,7 +452,7 @@ func (a *App) Start(ctx context.Context) error {
 	// HTTP server
 	go func() {
 		a.logger.Info("starting HTTP server", "addr", a.cfg.Addr)
-		if err := a.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := a.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.logger.Error("HTTP server error", "error", err)
 		}
 	}()
@@ -461,7 +462,7 @@ func (a *App) Start(ctx context.Context) error {
 	return a.Shutdown()
 }
 
-// Shutdown performs graceful shutdown of all services.
+// Shutdown performs a graceful shutdown of all services.
 func (a *App) Shutdown() error {
 	a.logger.Info("shutting down maintenant")
 
@@ -479,10 +480,9 @@ func (a *App) Shutdown() error {
 		a.licenseMgr.Stop()
 	}
 
-	a.rt.Close()
-	a.db.Close()
+	_ = a.rt.Close()
+	_ = a.db.Close()
 
 	a.logger.Info("maintenant stopped")
 	return nil
 }
-

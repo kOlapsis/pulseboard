@@ -30,6 +30,7 @@ type ContainerInfo struct {
 	OrchestrationUnit  string
 	RuntimeType        string
 	ControllerKind     string
+	ComposeWorkingDir  string
 }
 
 // Scanner checks containers for available updates by comparing tags and digests.

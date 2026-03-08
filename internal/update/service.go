@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,9 +23,9 @@ import (
 	"github.com/kolapsis/maintenant/internal/event"
 )
 
-// UpdateEnricher enriches raw scan results with additional data.
-// CE: no-op (returns nil). Pro: runs enrichment pipeline (CVE, changelog, risk).
-type UpdateEnricher interface {
+// Enricher enriches raw scan results with additional data.
+// CE: no-op (returns nil). Pro: runs an enrichment pipeline (CVE, changelog, risk).
+type Enricher interface {
 	Enrich(ctx context.Context, results []UpdateResult) error
 }
 
@@ -47,12 +46,12 @@ type ContainerLister interface {
 
 // Deps holds all dependencies for the update Service.
 type Deps struct {
-	Store         UpdateStore     // required
-	Scanner       *Scanner        // required
-	Containers    ContainerLister // required
-	Logger        *slog.Logger    // required
-	Enricher      UpdateEnricher  // optional — defaults to no-op
-	EventCallback EventCallback   // optional — nil-safe
+	Store         UpdateStore        // required
+	Scanner       *Scanner           // required
+	Containers    ContainerLister    // required
+	Logger        *slog.Logger       // required
+	Enricher      Enricher           // optional — defaults to no-op
+	EventCallback EventCallback      // optional — nil-safe
 	AlertChan     chan<- interface{} // optional — nil-safe
 }
 
@@ -61,7 +60,7 @@ type Service struct {
 	store         UpdateStore
 	scanner       *Scanner
 	containers    ContainerLister
-	enricher      UpdateEnricher
+	enricher      Enricher
 	logger        *slog.Logger
 	eventCallback EventCallback
 	alertChan     chan<- interface{}
@@ -111,7 +110,7 @@ func NewService(d Deps) *Service {
 }
 
 // SetEnricher sets the update enricher (no-op in CE, CVE/changelog/risk in Pro).
-func (s *Service) SetEnricher(e UpdateEnricher) {
+func (s *Service) SetEnricher(e Enricher) {
 	s.enricher = e
 }
 
@@ -125,12 +124,12 @@ func (s *Service) SetEventCallback(fn EventCallback) {
 	s.eventCallback = fn
 }
 
-// Start begins the periodic scan loop. Blocks until ctx is cancelled.
+// Start begins the periodic scan loop. Blocks until ctx is canceled.
 func (s *Service) Start(ctx context.Context) {
 	s.appCtx = ctx
 	s.logger.Info("starting update intelligence service", "interval", s.interval)
 
-	// Run first scan after a short delay to let containers start
+	// Run the first scan after a short delay to let containers start
 	select {
 	case <-ctx.Done():
 		return
@@ -153,7 +152,7 @@ func (s *Service) Start(ctx context.Context) {
 }
 
 // TriggerScan starts an immediate scan. Returns the scan ID.
-// The scan runs with the application-scoped context (not the HTTP request context)
+// The scan runs with the application-scoped context (not the HTTP request context),
 // so it survives after the triggering request completes.
 func (s *Service) TriggerScan(_ context.Context) (int64, error) {
 	s.mu.RLock()
@@ -220,11 +219,16 @@ func (s *Service) GenerateUpdateCommand(c ContainerInfo, latestTag string) strin
 
 	// Docker Compose
 	if c.RuntimeType != "kubernetes" && c.OrchestrationGroup != "" && c.OrchestrationUnit != "" {
-		return fmt.Sprintf("docker compose pull %s && docker compose up -d %s", c.OrchestrationUnit, c.OrchestrationUnit)
+		dir := c.ComposeWorkingDir
+		if dir == "" {
+			dir = "<compose-project-dir>"
+		}
+		return fmt.Sprintf("cd %s\ndocker compose pull %s\ndocker compose up -d --force-recreate %s",
+			dir, c.OrchestrationUnit, c.OrchestrationUnit)
 	}
 
 	// Standalone Docker container
-	return fmt.Sprintf("docker pull %s:%s && docker stop %s && docker rm %s && docker run -d --name %s %s:%s",
+	return fmt.Sprintf("docker pull %s:%s\ndocker stop %s && docker rm %s\ndocker run -d --name %s %s:%s",
 		repo, latestTag, c.Name, c.Name, c.Name, repo, latestTag)
 }
 
@@ -243,14 +247,18 @@ func (s *Service) GenerateRollbackCommand(c ContainerInfo, previousDigest string
 			kind, c.OrchestrationUnit, c.OrchestrationGroup)
 	}
 
-	// Docker Compose — pull by digest and recreate
+	// Docker Compose — recreate with previous digest
 	if c.RuntimeType != "kubernetes" && c.OrchestrationGroup != "" && c.OrchestrationUnit != "" {
-		return fmt.Sprintf("docker compose pull %s && docker compose up -d %s",
-			c.OrchestrationUnit, c.OrchestrationUnit)
+		dir := c.ComposeWorkingDir
+		if dir == "" {
+			dir = "<compose-project-dir>"
+		}
+		return fmt.Sprintf("cd %s\ndocker compose pull %s\ndocker compose up -d --force-recreate %s",
+			dir, c.OrchestrationUnit, c.OrchestrationUnit)
 	}
 
 	// Standalone Docker container — stop/rm/run with digest reference
-	return fmt.Sprintf("docker stop %s && docker rm %s && docker run -d --name %s %s@%s",
+	return fmt.Sprintf("docker stop %s && docker rm %s\ndocker run -d --name %s %s@%s",
 		c.Name, c.Name, c.Name, repo, previousDigest)
 }
 
@@ -271,7 +279,7 @@ func (s *Service) GenerateFixCommand(c ContainerInfo, currentTag, fixedInVersion
 		return ""
 	}
 
-	// Prevent downgrades: only generate command if fix version > current
+	// Prevent downgrades: only generate a command if a fix version > current
 	if !fixVer.GreaterThan(currentVer) {
 		return ""
 	}
@@ -321,7 +329,7 @@ func (s *Service) runScan(ctx context.Context) {
 
 	s.logger.Info("starting update scan")
 
-	// Create scan record
+	// Create a scan record
 	scanRecord := &ScanRecord{
 		StartedAt: time.Now(),
 		Status:    ScanStatusRunning,
@@ -458,9 +466,4 @@ func (s *Service) GetScanRecord(ctx context.Context, id int64) (*ScanRecord, err
 // GetLatestScanRecord returns the most recent scan record.
 func (s *Service) GetLatestScanRecord(ctx context.Context) (*ScanRecord, error) {
 	return s.store.GetLatestScanRecord(ctx)
-}
-
-// ParseScanID parses a scan ID from a string.
-func ParseScanID(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
 }

@@ -50,6 +50,7 @@ func (a *ContainerServiceAdapter) ListContainerInfos(ctx context.Context) ([]Con
 			OrchestrationUnit:  c.OrchestrationUnit,
 			RuntimeType:        c.RuntimeType,
 			ControllerKind:     c.ControllerKind,
+			ComposeWorkingDir:  c.ComposeWorkingDir,
 		})
 	}
 	return infos, nil
@@ -71,6 +72,7 @@ func (a *ContainerServiceAdapter) GetContainerInfo(ctx context.Context, external
 				OrchestrationUnit:  c.OrchestrationUnit,
 				RuntimeType:        c.RuntimeType,
 				ControllerKind:     c.ControllerKind,
+				ComposeWorkingDir:  c.ComposeWorkingDir,
 			}, nil
 		}
 	}

@@ -150,7 +150,34 @@ onMounted(loadDetail)
       </p>
     </div>
 
-    <!-- 2. Breaking changes warning -->
+    <!-- 2. Update command -->
+    <div v-if="detail.update_command" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          Update Command
+        </h4>
+        <button
+          @click="copyCommand"
+          class="text-[10px] text-pb-green-500 hover:text-pb-green-400 flex items-center gap-1 transition-colors"
+        >
+          <component :is="copied ? Check : Copy" :size="10" />
+          {{ copied ? 'Copied!' : 'Copy' }}
+        </button>
+      </div>
+      <pre
+        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono whitespace-pre"
+        >{{ detail.update_command }}</pre
+      >
+      <p
+        v-if="detail.update_command.includes('<compose-project-dir>')"
+        class="text-[9px] text-slate-600 mt-2"
+      >
+        Replace &lt;compose-project-dir&gt; with the actual path to your docker-compose.yml
+        directory.
+      </p>
+    </div>
+
+    <!-- 3. Breaking changes warning (Pro) -->
     <FeatureGate
       feature="changelog"
       title="Breaking Changes"
@@ -170,7 +197,7 @@ onMounted(loadDetail)
       </div>
     </FeatureGate>
 
-    <!-- 3. Risk Score (Pro) -->
+    <!-- 4. Risk Score (Pro) -->
     <FeatureGate
       feature="risk_scoring"
       title="Risk Score"
@@ -184,7 +211,7 @@ onMounted(loadDetail)
       </div>
     </FeatureGate>
 
-    <!-- 4. Changelog (Pro) -->
+    <!-- 5. Changelog (Pro) -->
     <FeatureGate
       feature="changelog"
       title="Changelog"
@@ -200,7 +227,7 @@ onMounted(loadDetail)
       </div>
     </FeatureGate>
 
-    <!-- 5. CVEs (Pro) -->
+    <!-- 6. CVEs (Pro) -->
     <FeatureGate
       feature="cve_enrichment"
       title="Vulnerabilities (CVE)"
@@ -213,26 +240,6 @@ onMounted(loadDetail)
         <CveList :cves="detail.active_cves || []" />
       </div>
     </FeatureGate>
-
-    <!-- 6. Update command -->
-    <div v-if="detail.update_command" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
-      <div class="flex items-center justify-between mb-2">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-          Update Command
-        </h4>
-        <button
-          @click="copyCommand"
-          class="text-[10px] text-pb-green-500 hover:text-pb-green-400 flex items-center gap-1 transition-colors"
-        >
-          <component :is="copied ? Check : Copy" :size="10" />
-          {{ copied ? 'Copied!' : 'Copy' }}
-        </button>
-      </div>
-      <pre
-        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono"
-        >{{ detail.update_command }}</pre
-      >
-    </div>
 
     <!-- 7. Rollback command -->
     <div
@@ -252,9 +259,16 @@ onMounted(loadDetail)
         </button>
       </div>
       <pre
-        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono"
+        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono whitespace-pre"
         >{{ detail.rollback_command }}</pre
       >
+      <p
+        v-if="detail.rollback_command.includes('<compose-project-dir>')"
+        class="text-[9px] text-slate-600 mt-2"
+      >
+        Replace &lt;compose-project-dir&gt; with the actual path to your docker-compose.yml
+        directory.
+      </p>
       <p class="text-[9px] text-slate-600 mt-2">
         Digest availability depends on registry retention policies.
       </p>

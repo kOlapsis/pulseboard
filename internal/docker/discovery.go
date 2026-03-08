@@ -18,34 +18,34 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	cmodel "github.com/kolapsis/maintenant/internal/container"
 )
 
 const (
-	labelComposeProject = "com.docker.compose.project"
-	labelComposeService = "com.docker.compose.service"
-	labelPBIgnore       = "maintenant.ignore"
-	labelPBGroup        = "maintenant.group"
-	labelPBSeverity     = "maintenant.alert.severity"
-	labelPBThreshold    = "maintenant.alert.restart_threshold"
-	labelPBChannels     = "maintenant.alert.channels"
+	labelComposeProject    = "com.docker.compose.project"
+	labelComposeService    = "com.docker.compose.service"
+	labelComposeWorkingDir = "com.docker.compose.project.working_dir"
+	labelPBIgnore          = "maintenant.ignore"
+	labelPBGroup           = "maintenant.group"
+	labelPBSeverity        = "maintenant.alert.severity"
+	labelPBThreshold       = "maintenant.alert.restart_threshold"
+	labelPBChannels        = "maintenant.alert.channels"
 )
 
 // SecurityConfig holds security-relevant fields extracted from Docker's ContainerInspect.
 type SecurityConfig struct {
-	Privileged  bool
-	NetworkMode string
+	Privileged   bool
+	NetworkMode  string
 	PortBindings []PortBindingInfo
 }
 
 // PortBindingInfo represents a single host port binding.
 type PortBindingInfo struct {
-	HostIP       string
-	HostPort     string
+	HostIP        string
+	HostPort      string
 	ContainerPort int
-	Protocol     string
+	Protocol      string
 }
 
 // DiscoveredContainer holds the result of discovering a single container.
@@ -122,7 +122,7 @@ type inspectResult struct {
 }
 
 // inspectAndMap calls ContainerInspect and maps the result to our domain model.
-func (c *Client) inspectAndMap(ctx context.Context, dc types.Container, now time.Time) (*inspectResult, error) {
+func (c *Client) inspectAndMap(ctx context.Context, dc container.Summary, now time.Time) (*inspectResult, error) {
 	info, err := c.cli.ContainerInspect(ctx, dc.ID)
 	if err != nil {
 		return nil, fmt.Errorf("inspect %s: %w", dc.ID[:12], err)
@@ -177,7 +177,7 @@ func extractSecurityConfig(hc *container.HostConfig) *SecurityConfig {
 }
 
 // mapFromList creates a Container from the docker ContainerList response.
-func mapFromList(dc types.Container, now time.Time) *cmodel.Container {
+func mapFromList(dc container.Summary, now time.Time) *cmodel.Container {
 	name := ""
 	if len(dc.Names) > 0 {
 		name = dc.Names[0]
@@ -199,6 +199,7 @@ func mapFromList(dc types.Container, now time.Time) *cmodel.Container {
 		State:              state,
 		OrchestrationGroup: dc.Labels[labelComposeProject],
 		OrchestrationUnit:  dc.Labels[labelComposeService],
+		ComposeWorkingDir:  dc.Labels[labelComposeWorkingDir],
 		RuntimeType:        "docker",
 		PodCount:           1,
 		ReadyCount:         readyCount,
