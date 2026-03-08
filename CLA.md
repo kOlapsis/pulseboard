@@ -30,7 +30,7 @@ the Maintenant project.
 This includes the right to distribute Contributions under:
 
 - The **AGPL-3.0** (or any later version), and
-- A **commercial license** (see `LICENSE-COMMERCIAL.md`).
+- A **commercial license** (see `COMMERCIAL-LICENSE.md`).
 
 This dual-licensing grant is essential to the open-core model of the project.
 

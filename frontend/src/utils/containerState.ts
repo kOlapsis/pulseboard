@@ -6,7 +6,7 @@
  * with one of these licenses.
  *
  * AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html
- * Commercial: See LICENSE-COMMERCIAL.md
+ * Commercial: See COMMERCIAL-LICENSE.md
  *
  * Source: https://github.com/kolapsis/maintenant
  */
