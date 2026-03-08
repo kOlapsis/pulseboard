@@ -98,9 +98,6 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		logger: logger,
 	}
 
-	v1.SetBuildVersion(cfg.Version)
-	v1.SetOrganisationName(cfg.OrgName)
-
 	if cfg.K8sNamespaces != "" {
 		logger.Info("K8s namespace allowlist configured", "namespaces", cfg.K8sNamespaces)
 	}
@@ -276,39 +273,8 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	a.maintScheduler = status.NewMaintenanceScheduler(maintenanceStore, statusCompStore, incidentStore, a.statusSvc, logger)
 	a.statusHandler = status.NewHandler(a.statusSvc, a.statusBroker, logger)
 
-	// --- Router ---
-	a.router = v1.NewRouter(a.broker, rt, a.containerSvc, uptimeCalc, a.endpointSvc, a.heartbeatSvc, a.certSvc, a.resourceSvc, logger, v1.AlertOpts{
-		AlertStore:   alertStore,
-		ChannelStore: channelStore,
-		SilenceStore: silenceStore,
-		Notifier:     a.notifier,
-	}, v1.APIConfig{
-		WebhookStore: webhookStore,
-	}, v1.StatusAdminOpts{
-		Components:  statusCompStore,
-		Incidents:   incidentStore,
-		Subscribers: subscriberStore,
-		Maintenance: maintenanceStore,
-		StatusSvc:   a.statusSvc,
-		Broker:      a.statusBroker,
-	})
-
-	a.router.RegisterLicenseRoutes(a.licenseMgr)
-
-	uptimeDailyStore := sqlite.NewUptimeDailyStore(db)
-	a.router.RegisterUIRoutes(v1.UIConfig{
-		UptimeDaily:      uptimeDailyStore,
-		LogStreamer:       rt,
-		ContainerSvc:     a.containerSvc,
-		ResourceTopSvc:   a.resourceSvc,
-		SparklineFetcher: epStore,
-	})
-
 	// --- Webhook dispatcher ---
 	a.webhookDispatcher = webhook.NewDispatcher(webhookStore, a.notifier, logger)
-
-	// --- Wire alert callbacks ---
-	a.wireAlertCallbacks(alertDetector)
 
 	// --- Update intelligence ---
 	registryClient := update.NewRegistryClient()
@@ -332,10 +298,6 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		Enricher:   updateEnricher,
 	})
 
-	a.wireUpdateCallback()
-	a.router.RegisterUpdateRoutes(a.updateSvc, updateStore, containerAdapter)
-	a.router.RegisterSecurityRoutes(a.securitySvc, a.containerSvc)
-
 	// --- Security posture scoring ---
 	ackStore := sqlite.NewAcknowledgmentStore(db)
 	a.scorer = security.NewScorer(security.ScorerDeps{
@@ -350,8 +312,60 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	if cfg.SecurityScoreThreshold > 0 {
 		logger.Info("security posture threshold configured", "threshold", cfg.SecurityScoreThreshold)
 	}
+
+	// --- Wire alert callbacks ---
+	a.wireAlertCallbacks(alertDetector)
+	a.wireUpdateCallback()
 	a.wirePostureCallbacks()
-	a.router.RegisterPostureRoutes(a.scorer, a.containerSvc, ackStore)
+
+	// --- Router ---
+	uptimeDailyStore := sqlite.NewUptimeDailyStore(db)
+	a.router = v1.NewRouter(v1.HandlerDeps{
+		// Core services
+		Broker:       a.broker,
+		Runtime:      rt,
+		Containers:   a.containerSvc,
+		Uptime:       uptimeCalc,
+		Endpoints:    a.endpointSvc,
+		Heartbeats:   a.heartbeatSvc,
+		Certificates: a.certSvc,
+		Resources:    a.resourceSvc,
+		Logger:       logger,
+		// Alert pipeline
+		AlertStore:   alertStore,
+		ChannelStore: channelStore,
+		SilenceStore: silenceStore,
+		Notifier:     a.notifier,
+		// Status page admin
+		StatusComponents:  statusCompStore,
+		StatusIncidents:   incidentStore,
+		StatusSubscribers: subscriberStore,
+		StatusMaintenance: maintenanceStore,
+		StatusSvc:         a.statusSvc,
+		StatusBroker:      a.statusBroker,
+		// Webhooks
+		WebhookStore: webhookStore,
+		// UI extras
+		UptimeDaily:      uptimeDailyStore,
+		LogStreamer:       rt,
+		ResourceTopSvc:   a.resourceSvc,
+		SparklineFetcher: epStore,
+		// Update intelligence
+		UpdateSvc:        a.updateSvc,
+		UpdateStore:      updateStore,
+		ContainerAdapter: containerAdapter,
+		// Security
+		SecuritySvc: a.securitySvc,
+		Scorer:      a.scorer,
+		AckStore:    ackStore,
+		// License
+		LicenseMgr: a.licenseMgr,
+		// HTTP config
+		CORSOrigins:      cfg.CORSOrigins,
+		MaxBodySize:      cfg.MaxBodySize,
+		BuildVersion:     cfg.Version,
+		OrganisationName: cfg.OrgName,
+	})
 
 	// --- Rate limiter ---
 	a.rl = ratelimit.New(10, 20)

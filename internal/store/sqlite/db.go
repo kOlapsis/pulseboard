@@ -54,15 +54,15 @@ func Open(dbPath string, logger *slog.Logger) (*DB, error) {
 
 	sdb := &DB{
 		db:     db,
+		writer: NewWriter(db, logger),
 		logger: logger,
 	}
 
 	return sdb, nil
 }
 
-// StartWriter initializes and starts the single-writer goroutine.
+// StartWriter starts the single-writer goroutine.
 func (d *DB) StartWriter(ctx context.Context) {
-	d.writer = NewWriter(d.db, d.logger)
 	d.writer.Start(ctx)
 }
 

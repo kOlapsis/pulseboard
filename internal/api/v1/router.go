@@ -15,9 +15,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
 
 	"github.com/kolapsis/maintenant/internal/alert"
 	"github.com/kolapsis/maintenant/internal/certificate"
@@ -34,34 +31,6 @@ import (
 	"github.com/kolapsis/maintenant/internal/webhook"
 )
 
-// corsAllowedOrigins holds the parsed CORS allowed origins (cached at init time).
-// nil means same-origin only (no CORS headers), ["*"] means wildcard.
-var corsAllowedOrigins []string
-
-// maxBodySize holds the maximum request body size in bytes for POST/PUT requests.
-var maxBodySize int64 = 1048576 // 1 MB default
-
-func init() {
-	if raw := os.Getenv("MAINTENANT_CORS_ORIGINS"); raw != "" {
-		if raw == "*" {
-			corsAllowedOrigins = []string{"*"}
-		} else {
-			parts := strings.Split(raw, ",")
-			for _, p := range parts {
-				if trimmed := strings.TrimSpace(p); trimmed != "" {
-					corsAllowedOrigins = append(corsAllowedOrigins, trimmed)
-				}
-			}
-		}
-	}
-
-	if raw := os.Getenv("MAINTENANT_MAX_BODY_SIZE"); raw != "" {
-		if n, err := strconv.ParseInt(raw, 10, 64); err == nil && n > 0 {
-			maxBodySize = n
-		}
-	}
-}
-
 // ErrorResponse represents the standard JSON error format.
 type ErrorResponse struct {
 	Error ErrorDetail `json:"error"`
@@ -73,49 +42,61 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-// AlertOpts holds the alert-related dependencies for the router.
-type AlertOpts struct {
+// HandlerDeps holds all dependencies needed to build the API handler.
+type HandlerDeps struct {
+	// Core services
+	Broker       *SSEBroker
+	Runtime      pbruntime.Runtime
+	Containers   *container.Service
+	Uptime       *container.UptimeCalculator
+	Endpoints    *endpoint.Service
+	Heartbeats   *heartbeat.Service
+	Certificates *certificate.Service
+	Resources    *resource.Service
+	Logger       *slog.Logger
+
+	// Alert pipeline
 	AlertStore   alert.AlertStore
 	ChannelStore alert.ChannelStore
 	SilenceStore alert.SilenceStore
 	Notifier     *alert.Notifier
-}
 
-// StatusAdminOpts holds the status page admin dependencies for the router.
-type StatusAdminOpts struct {
-	Components  status.ComponentStore
-	Incidents   status.IncidentStore
-	Subscribers status.SubscriberStore
-	Maintenance status.MaintenanceStore
-	StatusSvc   *status.Service
-	Broker      *SSEBroker
-}
+	// Status page admin
+	StatusComponents  status.ComponentStore
+	StatusIncidents   status.IncidentStore
+	StatusSubscribers status.SubscriberStore
+	StatusMaintenance status.MaintenanceStore
+	StatusSvc         *status.Service
+	StatusBroker      *SSEBroker
 
-// APIConfig holds the webhook dependencies for the router.
-type APIConfig struct {
+	// Webhooks
 	WebhookStore webhook.WebhookSubscriptionStore
-}
 
-// UIConfig holds dependencies for UI redesign endpoints.
-type UIConfig struct {
+	// UI extras
 	UptimeDaily      UptimeDailyFetcher
-	LogStreamer      LogStreamer
-	ContainerSvc     *container.Service
+	LogStreamer       LogStreamer
 	ResourceTopSvc   ResourceTopService
 	SparklineFetcher SparklineDataFetcher
+
+	// Update intelligence
+	UpdateSvc        *update.Service
+	UpdateStore      update.UpdateStore
+	ContainerAdapter ContainerInfoProvider
+
+	// Security
+	SecuritySvc *security.Service
+	Scorer      *security.Scorer
+	AckStore    security.AcknowledgmentStore
+
+	// License
+	LicenseMgr *license.LicenseManager
+
+	// HTTP config
+	CORSOrigins      string // comma-separated origins or "*"
+	MaxBodySize      int64  // 0 = 1MB default
+	BuildVersion     string
+	OrganisationName string
 }
-
-// buildVersion is set at startup via SetBuildVersion.
-var buildVersion string
-
-// SetBuildVersion stores the application version for the health endpoint.
-func SetBuildVersion(v string) { buildVersion = v }
-
-// organisationName is set at startup via SetOrganisationName.
-var organisationName string
-
-// SetOrganisationName stores the organisation name for the edition/status endpoints.
-func SetOrganisationName(name string) { organisationName = name }
 
 // Router sets up the /api/v1 route group.
 type Router struct {
@@ -124,53 +105,42 @@ type Router struct {
 	logger           *slog.Logger
 	runtime          pbruntime.Runtime
 	containerHandler *ContainerHandler
+	corsOrigins      []string
+	maxBodySize      int64
+	buildVersion     string
+	organisationName string
 }
 
-// RegisterUIRoutes registers UI redesign endpoints (daily uptime, log streaming, top resources).
-func (r *Router) RegisterUIRoutes(cfg UIConfig) {
-	if cfg.UptimeDaily != nil {
-		udh := NewUptimeDailyHandler(cfg.UptimeDaily)
-		r.mux.HandleFunc("GET /api/v1/endpoints/{id}/uptime/daily", udh.HandleEndpointDailyUptime)
-		r.mux.HandleFunc("GET /api/v1/heartbeats/{id}/uptime/daily", udh.HandleHeartbeatDailyUptime)
+// NewRouter creates a new API v1 router from the unified HandlerDeps.
+func NewRouter(d HandlerDeps) *Router {
+	maxBody := d.MaxBodySize
+	if maxBody <= 0 {
+		maxBody = 1048576 // 1 MB default
 	}
 
-	if cfg.LogStreamer != nil && cfg.ContainerSvc != nil {
-		lsh := NewLogStreamHandler(cfg.LogStreamer, cfg.ContainerSvc)
-		r.mux.HandleFunc("GET /api/v1/containers/{id}/logs/stream", lsh.HandleLogStream)
-	}
-
-	if cfg.ResourceTopSvc != nil {
-		rth := NewResourceTopHandler(cfg.ResourceTopSvc)
-		r.mux.HandleFunc("GET /api/v1/resources/top", rth.HandleGetTopConsumers)
-	}
-
-	if cfg.SparklineFetcher != nil {
-		sh := NewSparklineHandler(cfg.SparklineFetcher)
-		r.mux.HandleFunc("GET /api/v1/dashboard/sparklines", sh.HandleGetSparklines)
-	}
-}
-
-// NewRouter creates a new API v1 router with SSE middleware.
-func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, uptime *container.UptimeCalculator, epSvc *endpoint.Service, hbSvc *heartbeat.Service, certSvc *certificate.Service, resSvc *resource.Service, logger *slog.Logger, alertOpts AlertOpts, apiCfg APIConfig, statusOpts ...StatusAdminOpts) *Router {
 	r := &Router{
-		mux:     http.NewServeMux(),
-		broker:  broker,
-		logger:  logger,
-		runtime: rt,
+		mux:              http.NewServeMux(),
+		broker:           d.Broker,
+		logger:           d.Logger,
+		runtime:          d.Runtime,
+		corsOrigins:      parseCORSOrigins(d.CORSOrigins),
+		maxBodySize:      maxBody,
+		buildVersion:     d.BuildVersion,
+		organisationName: d.OrganisationName,
 	}
 
 	// Webhook management
-	if apiCfg.WebhookStore != nil {
-		wh := NewWebhookHandler(apiCfg.WebhookStore, logger)
+	if d.WebhookStore != nil {
+		wh := NewWebhookHandler(d.WebhookStore, d.Logger)
 		r.mux.HandleFunc("GET /api/v1/webhooks", wh.HandleListWebhooks)
 		r.mux.HandleFunc("POST /api/v1/webhooks", wh.HandleCreateWebhook)
 		r.mux.HandleFunc("DELETE /api/v1/webhooks/{id}", wh.HandleDeleteWebhook)
 		r.mux.HandleFunc("POST /api/v1/webhooks/{id}/test", wh.HandleTestWebhook)
 	}
 
-	ch := NewContainerHandler(svc, uptime)
+	ch := NewContainerHandler(d.Containers, d.Uptime)
 	r.containerHandler = ch
-	if cl, ok := rt.(ContainerNameLister); ok {
+	if cl, ok := d.Runtime.(ContainerNameLister); ok {
 		ch.SetContainerNameLister(cl)
 	}
 
@@ -182,8 +152,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	r.mux.HandleFunc("GET /api/v1/containers/{id}/logs", ch.HandleLogs)
 
 	// Endpoint REST endpoints
-	if epSvc != nil {
-		eh := NewEndpointHandler(epSvc, svc)
+	if d.Endpoints != nil {
+		eh := NewEndpointHandler(d.Endpoints, d.Containers)
 		r.mux.HandleFunc("GET /api/v1/endpoints", eh.HandleListEndpoints)
 		r.mux.HandleFunc("GET /api/v1/endpoints/{id}", eh.HandleGetEndpoint)
 		r.mux.HandleFunc("GET /api/v1/endpoints/{id}/checks", eh.HandleListChecks)
@@ -191,8 +161,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	// Heartbeat REST endpoints
-	if hbSvc != nil {
-		hh := NewHeartbeatHandler(hbSvc)
+	if d.Heartbeats != nil {
+		hh := NewHeartbeatHandler(d.Heartbeats)
 		r.mux.HandleFunc("GET /api/v1/heartbeats", hh.HandleList)
 		r.mux.HandleFunc("POST /api/v1/heartbeats", hh.HandleCreate)
 		r.mux.HandleFunc("GET /api/v1/heartbeats/{id}", hh.HandleGet)
@@ -204,7 +174,7 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		r.mux.HandleFunc("GET /api/v1/heartbeats/{id}/pings", hh.HandleListPings)
 
 		// Public ping endpoints (top-level, no auth)
-		ph := NewPingHandler(hbSvc)
+		ph := NewPingHandler(d.Heartbeats)
 		r.mux.HandleFunc("GET /ping/{uuid}/start", ph.HandleStartPing)
 		r.mux.HandleFunc("POST /ping/{uuid}/start", ph.HandleStartPing)
 		r.mux.HandleFunc("GET /ping/{uuid}/{exit_code}", ph.HandleExitCodePing)
@@ -214,8 +184,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	// Resource monitoring endpoints
-	if resSvc != nil {
-		rh := NewResourceHandler(resSvc)
+	if d.Resources != nil {
+		rh := NewResourceHandler(d.Resources)
 		r.mux.HandleFunc("GET /api/v1/containers/{id}/resources/current", rh.HandleGetCurrent)
 		r.mux.HandleFunc("GET /api/v1/containers/{id}/resources/history", requireEnterprise(rh.HandleGetHistory))
 		r.mux.HandleFunc("GET /api/v1/resources/summary", rh.HandleGetSummary)
@@ -224,8 +194,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	// Certificate REST endpoints
-	if certSvc != nil {
-		certH := NewCertificateHandler(certSvc)
+	if d.Certificates != nil {
+		certH := NewCertificateHandler(d.Certificates)
 		r.mux.HandleFunc("GET /api/v1/certificates", certH.HandleList)
 		r.mux.HandleFunc("POST /api/v1/certificates", certH.HandleCreate)
 		r.mux.HandleFunc("GET /api/v1/certificates/{id}", certH.HandleGet)
@@ -235,8 +205,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	// Alert engine endpoints
-	if alertOpts.AlertStore != nil {
-		ah := NewAlertHandler(alertOpts.AlertStore, alertOpts.ChannelStore, alertOpts.SilenceStore, alertOpts.Notifier, broker)
+	if d.AlertStore != nil {
+		ah := NewAlertHandler(d.AlertStore, d.ChannelStore, d.SilenceStore, d.Notifier, d.Broker)
 		// Alert history
 		r.mux.HandleFunc("GET /api/v1/alerts", ah.HandleListAlerts)
 		r.mux.HandleFunc("GET /api/v1/alerts/active", ah.HandleGetActiveAlerts)
@@ -258,9 +228,8 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 	}
 
 	// Status page admin endpoints
-	if len(statusOpts) > 0 {
-		so := statusOpts[0]
-		sh := NewStatusAdminHandler(so.Components, so.Incidents, so.Subscribers, so.Maintenance, so.StatusSvc, so.Broker)
+	if d.StatusComponents != nil {
+		sh := NewStatusAdminHandler(d.StatusComponents, d.StatusIncidents, d.StatusSubscribers, d.StatusMaintenance, d.StatusSvc, d.StatusBroker)
 		// Component groups
 		r.mux.HandleFunc("GET /api/v1/status/groups", sh.HandleListGroups)
 		r.mux.HandleFunc("POST /api/v1/status/groups", sh.HandleCreateGroup)
@@ -272,7 +241,7 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		r.mux.HandleFunc("PUT /api/v1/status/components/{id}", sh.HandleUpdateComponent)
 		r.mux.HandleFunc("DELETE /api/v1/status/components/{id}", sh.HandleDeleteComponent)
 		// Incidents
-		if so.Incidents != nil {
+		if d.StatusIncidents != nil {
 			r.mux.HandleFunc("GET /api/v1/status/incidents", sh.HandleListIncidents)
 			r.mux.HandleFunc("POST /api/v1/status/incidents", sh.HandleCreateIncident)
 			r.mux.HandleFunc("PUT /api/v1/status/incidents/{id}", sh.HandleUpdateIncident)
@@ -280,14 +249,14 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 			r.mux.HandleFunc("POST /api/v1/status/incidents/{id}/updates", sh.HandlePostUpdate)
 		}
 		// Maintenance windows
-		if so.Maintenance != nil {
+		if d.StatusMaintenance != nil {
 			r.mux.HandleFunc("GET /api/v1/status/maintenance", sh.HandleListMaintenance)
 			r.mux.HandleFunc("POST /api/v1/status/maintenance", sh.HandleCreateMaintenance)
 			r.mux.HandleFunc("PUT /api/v1/status/maintenance/{id}", sh.HandleUpdateMaintenance)
 			r.mux.HandleFunc("DELETE /api/v1/status/maintenance/{id}", sh.HandleDeleteMaintenance)
 		}
 		// Subscribers
-		if so.Subscribers != nil {
+		if d.StatusSubscribers != nil {
 			r.mux.HandleFunc("GET /api/v1/status/subscribers", sh.HandleListSubscribers)
 		}
 		// SMTP config (Pro only)
@@ -296,44 +265,75 @@ func NewRouter(broker *SSEBroker, rt pbruntime.Runtime, svc *container.Service, 
 		r.mux.HandleFunc("POST /api/v1/status/smtp/test", requireEnterprise(sh.HandleTestSmtp))
 	}
 
+	// UI extras
+	r.registerUIRoutes(d)
+
 	// Runtime status endpoint
 	r.mux.HandleFunc("GET /api/v1/runtime/status", func(w http.ResponseWriter, req *http.Request) {
 		label := "Containers"
-		if rt != nil && rt.Name() == "kubernetes" {
+		if d.Runtime != nil && d.Runtime.Name() == "kubernetes" {
 			label = "Workloads"
 		}
 		WriteJSON(w, http.StatusOK, map[string]interface{}{
-			"runtime":   rt.Name(),
-			"connected": rt.IsConnected(),
+			"runtime":   d.Runtime.Name(),
+			"connected": d.Runtime.IsConnected(),
 			"label":     label,
 		})
 	})
 
 	// Edition endpoint — exposes CE/Pro feature flags for frontend gating
-	smtpConfigured := alertOpts.Notifier != nil && alertOpts.Notifier.SMTPConfigured()
-	r.mux.HandleFunc("GET /api/v1/edition", handleGetEdition(smtpConfigured))
+	smtpConfigured := d.Notifier != nil && d.Notifier.SMTPConfigured()
+	r.mux.HandleFunc("GET /api/v1/edition", r.handleGetEdition(smtpConfigured))
 
 	// Health endpoint
-	r.mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, req *http.Request) {
-		resp := map[string]string{"status": "ok"}
-		if buildVersion != "" {
-			resp["version"] = buildVersion
-		}
-		WriteJSON(w, http.StatusOK, resp)
-	})
+	r.mux.HandleFunc("GET /api/v1/health", r.handleHealth)
 
 	// SSE endpoint
-	r.mux.Handle("GET /api/v1/containers/events", broker)
+	r.mux.Handle("GET /api/v1/containers/events", d.Broker)
+
+	// License
+	r.registerLicenseRoutes(d.LicenseMgr)
+
+	// Update intelligence
+	r.registerUpdateRoutes(d)
+
+	// Security insights
+	r.registerSecurityRoutes(d)
+
+	// Security posture
+	r.registerPostureRoutes(d)
 
 	return r
 }
 
-// RegisterLicenseRoutes registers the license status endpoint.
-func (r *Router) RegisterLicenseRoutes(mgr *license.LicenseManager) {
+// registerUIRoutes registers optional UI endpoints (daily uptime, log streaming, top resources).
+func (r *Router) registerUIRoutes(d HandlerDeps) {
+	if d.UptimeDaily != nil {
+		udh := NewUptimeDailyHandler(d.UptimeDaily)
+		r.mux.HandleFunc("GET /api/v1/endpoints/{id}/uptime/daily", udh.HandleEndpointDailyUptime)
+		r.mux.HandleFunc("GET /api/v1/heartbeats/{id}/uptime/daily", udh.HandleHeartbeatDailyUptime)
+	}
+
+	if d.LogStreamer != nil && d.Containers != nil {
+		lsh := NewLogStreamHandler(d.LogStreamer, d.Containers)
+		r.mux.HandleFunc("GET /api/v1/containers/{id}/logs/stream", lsh.HandleLogStream)
+	}
+
+	if d.ResourceTopSvc != nil {
+		rth := NewResourceTopHandler(d.ResourceTopSvc)
+		r.mux.HandleFunc("GET /api/v1/resources/top", rth.HandleGetTopConsumers)
+	}
+
+	if d.SparklineFetcher != nil {
+		sh := NewSparklineHandler(d.SparklineFetcher)
+		r.mux.HandleFunc("GET /api/v1/dashboard/sparklines", sh.HandleGetSparklines)
+	}
+}
+
+func (r *Router) registerLicenseRoutes(mgr *license.LicenseManager) {
 	if mgr == nil {
 		return
 	}
-
 	r.mux.HandleFunc("GET /api/v1/license/status", func(w http.ResponseWriter, req *http.Request) {
 		state := mgr.State()
 		WriteJSON(w, http.StatusOK, map[string]interface{}{
@@ -346,13 +346,12 @@ func (r *Router) RegisterLicenseRoutes(mgr *license.LicenseManager) {
 	})
 }
 
-// RegisterUpdateRoutes registers update intelligence endpoints.
-func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore update.UpdateStore, containers ContainerInfoProvider) {
-	if updateSvc == nil {
+func (r *Router) registerUpdateRoutes(d HandlerDeps) {
+	if d.UpdateSvc == nil {
 		return
 	}
 
-	uh := NewUpdateHandler(updateSvc, updateStore, containers)
+	uh := NewUpdateHandler(d.UpdateSvc, d.UpdateStore, d.ContainerAdapter)
 	r.mux.HandleFunc("GET /api/v1/updates", uh.HandleListUpdates)
 	r.mux.HandleFunc("GET /api/v1/updates/summary", uh.HandleGetUpdateSummary)
 	r.mux.HandleFunc("GET /api/v1/updates/dry-run", uh.HandleGetDryRun)
@@ -366,34 +365,37 @@ func (r *Router) RegisterUpdateRoutes(updateSvc *update.Service, updateStore upd
 	r.mux.HandleFunc("DELETE /api/v1/updates/pin/{container_id}", uh.HandleUnpinVersion)
 
 	// CVE routes (edition-gated in handler)
-	ch := NewCVEHandler(updateStore)
+	ch := NewCVEHandler(d.UpdateStore)
 	r.mux.HandleFunc("GET /api/v1/cve", ch.HandleListCVEs)
 	r.mux.HandleFunc("GET /api/v1/cve/{container_id}", ch.HandleGetContainerCVEs)
 
 	// Risk scoring routes (Pro only)
-	rh := NewRiskHandler(updateStore)
+	rh := NewRiskHandler(d.UpdateStore)
 	r.mux.HandleFunc("GET /api/v1/risk", requireEnterprise(rh.HandleListRiskScores))
 	r.mux.HandleFunc("GET /api/v1/risk/{container_id}", requireEnterprise(rh.HandleGetContainerRisk))
 	r.mux.HandleFunc("GET /api/v1/risk/{container_id}/history", requireEnterprise(rh.HandleGetRiskHistory))
-
 }
 
-// RegisterSecurityRoutes registers security insight endpoints.
-func (r *Router) RegisterSecurityRoutes(secSvc *security.Service, containerSvc *container.Service) {
-	sh := NewSecurityHandler(secSvc, containerSvc)
+func (r *Router) registerSecurityRoutes(d HandlerDeps) {
+	if d.SecuritySvc == nil {
+		return
+	}
+	sh := NewSecurityHandler(d.SecuritySvc, d.Containers)
 	r.mux.HandleFunc("GET /api/v1/security/insights", sh.HandleListInsights)
 	r.mux.HandleFunc("GET /api/v1/security/insights/{container_id}", sh.HandleGetContainerInsights)
 	r.mux.HandleFunc("GET /api/v1/security/summary", sh.HandleGetSummary)
 
 	// Wire security provider into container handler for enriched list responses
 	if r.containerHandler != nil {
-		r.containerHandler.SetSecurityProvider(secSvc)
+		r.containerHandler.SetSecurityProvider(d.SecuritySvc)
 	}
 }
 
-// RegisterPostureRoutes registers security posture endpoints (Enterprise-only).
-func (r *Router) RegisterPostureRoutes(scorer *security.Scorer, containerSvc *container.Service, ackStore security.AcknowledgmentStore) {
-	ph := NewPostureHandler(scorer, containerSvc, ackStore)
+func (r *Router) registerPostureRoutes(d HandlerDeps) {
+	if d.Scorer == nil {
+		return
+	}
+	ph := NewPostureHandler(d.Scorer, d.Containers, d.AckStore)
 
 	// Posture endpoints
 	r.mux.HandleFunc("GET /api/v1/security/posture", requireEnterprise(ph.HandleGetPosture))
@@ -406,9 +408,16 @@ func (r *Router) RegisterPostureRoutes(scorer *security.Scorer, containerSvc *co
 	r.mux.HandleFunc("DELETE /api/v1/security/acknowledgments/{id}", requireEnterprise(ph.HandleDeleteAcknowledgment))
 }
 
-// Handler returns the HTTP handler with CORS and body size limit middleware applied.
+// Handler returns the HTTP handler with the full middleware chain applied.
+// Middleware order (outermost to innermost): panicRecovery → requestLogger → requestID → cors → bodyLimit → mux
 func (r *Router) Handler() http.Handler {
-	return corsMiddleware(bodySizeLimitMiddleware(r.mux))
+	var h http.Handler = r.mux
+	h = bodyLimit(r.maxBodySize, h)
+	h = cors(r.corsOrigins, h)
+	h = requestID(h)
+	h = requestLogger(h, r.logger)
+	h = panicRecovery(h, r.logger)
+	return h
 }
 
 // WriteJSON writes a JSON response with the given status code.
@@ -428,64 +437,22 @@ func WriteError(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
-// corsMiddleware adds CORS headers based on MAINTENANT_CORS_ORIGINS configuration.
-// If unset: no CORS headers (same-origin only). If "*": wildcard. Otherwise: origin allowlist.
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(corsAllowedOrigins) > 0 {
-			if corsAllowedOrigins[0] == "*" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-			} else {
-				origin := r.Header.Get("Origin")
-				for _, allowed := range corsAllowedOrigins {
-					if origin == allowed {
-						w.Header().Set("Access-Control-Allow-Origin", origin)
-						w.Header().Set("Vary", "Origin")
-						break
-					}
-				}
-			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		}
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// bodySizeLimitMiddleware limits the request body size for POST and PUT requests.
-func bodySizeLimitMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost || r.Method == http.MethodPut {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// requireEnterprise wraps a handler to reject requests in Community edition.
-func requireEnterprise(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if extension.CurrentEdition() != extension.Enterprise {
-			WriteError(w, http.StatusForbidden, "PRO_REQUIRED", "This feature requires the Pro edition")
-			return
-		}
-		next(w, r)
+// handleHealth returns the health check response.
+func (r *Router) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	resp := map[string]string{"status": "ok"}
+	if r.buildVersion != "" {
+		resp["version"] = r.buildVersion
 	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 // handleGetEdition returns a handler for the current edition and feature flags.
-func handleGetEdition(smtpConfigured bool) http.HandlerFunc {
+func (r *Router) handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		isEnterprise := extension.CurrentEdition() == extension.Enterprise
 		WriteJSON(w, http.StatusOK, map[string]interface{}{
 			"edition":           string(extension.CurrentEdition()),
-			"organisation_name": organisationName,
+			"organisation_name": r.organisationName,
 			"features": map[string]bool{
 				"cve_enrichment":      isEnterprise,
 				"risk_scoring":        isEnterprise,
