@@ -61,16 +61,6 @@ func TestNoopMaintenanceSuppressor(t *testing.T) {
 	}
 }
 
-func TestNoopTemplateEngine(t *testing.T) {
-	result, err := NoopTemplateEngine{}.Render(context.Background(), "test", map[string]any{"key": "val"})
-	if err != ErrNotAvailable {
-		t.Fatalf("expected ErrNotAvailable, got %v", err)
-	}
-	if result != "" {
-		t.Fatalf("expected empty string, got %q", result)
-	}
-}
-
 func TestNoopIncidentManager(t *testing.T) {
 	ctx := context.Background()
 	m := NoopIncidentManager{}

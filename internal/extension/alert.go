@@ -39,9 +39,3 @@ func (NoopMaintenanceSuppressor) IsSuppressed(_ context.Context, _ string, _ str
 	return false, nil
 }
 
-// NoopTemplateEngine is the CE default. Implements alert.TemplateEngine.
-type NoopTemplateEngine struct{}
-
-func (NoopTemplateEngine) Render(_ context.Context, _ string, _ map[string]any) (string, error) {
-	return "", ErrNotAvailable
-}

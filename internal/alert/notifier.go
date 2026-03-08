@@ -57,9 +57,8 @@ type Notifier struct {
 	jobs           chan NotificationJob
 	channelStore   ChannelStore
 	httpClient     *http.Client
-	smtpSender     *SMTPSender
-	templateEngine TemplateEngine
-	logger         *slog.Logger
+	smtpSender *SMTPSender
+	logger     *slog.Logger
 }
 
 // NewNotifier creates a new webhook notifier.
@@ -67,24 +66,11 @@ func NewNotifier(channelStore ChannelStore, logger *slog.Logger) *Notifier {
 	return &Notifier{
 		jobs:           make(chan NotificationJob, notifierChannelBuffer),
 		channelStore:   channelStore,
-		templateEngine: noopTemplateEngine{},
 		httpClient: &http.Client{
 			Timeout: webhookTimeout,
 		},
 		logger: logger,
 	}
-}
-
-// SetTemplateEngine sets the template rendering extension.
-func (n *Notifier) SetTemplateEngine(t TemplateEngine) {
-	n.templateEngine = t
-}
-
-// noopTemplateEngine is the Notifier-internal no-op default.
-type noopTemplateEngine struct{}
-
-func (noopTemplateEngine) Render(_ context.Context, _ string, _ map[string]any) (string, error) {
-	return "", fmt.Errorf("no template engine configured")
 }
 
 // SetSMTPSender configures SMTP delivery for email channels.
@@ -143,31 +129,10 @@ func (n *Notifier) processJob(ctx context.Context, job NotificationJob) {
 		return
 	}
 
-	// Consult template engine extension (Pro: custom templates per channel)
-	var body []byte
-	rendered, renderErr := n.templateEngine.Render(ctx, channelType, map[string]any{
-		"event":       eventType,
-		"alert_id":    job.Alert.ID,
-		"source":      job.Alert.Source,
-		"alert_type":  job.Alert.AlertType,
-		"severity":    job.Alert.Severity,
-		"status":      job.Alert.Status,
-		"message":     job.Alert.Message,
-		"entity_type": job.Alert.EntityType,
-		"entity_id":   job.Alert.EntityID,
-		"entity_name": job.Alert.EntityName,
-		"fired_at":    job.Alert.FiredAt,
-	})
-	if renderErr == nil {
-		body = []byte(rendered)
-	} else {
-		// Fall through to default formatter
-		var fmtErr error
-		body, fmtErr = formatPayload(channelType, eventType, job.Alert)
-		if fmtErr != nil {
-			n.failDelivery(ctx, job.Delivery, fmt.Sprintf("marshal payload: %s", fmtErr))
-			return
-		}
+	body, err := formatPayload(channelType, eventType, job.Alert)
+	if err != nil {
+		n.failDelivery(ctx, job.Delivery, fmt.Sprintf("marshal payload: %s", err))
+		return
 	}
 
 	var lastErr error

@@ -168,11 +168,6 @@ type MaintenanceSuppressor interface {
 	IsSuppressed(ctx context.Context, source string, entityType string, entityID string) (bool, error)
 }
 
-// TemplateEngine renders notification messages using custom templates.
-type TemplateEngine interface {
-	Render(ctx context.Context, templateName string, vars map[string]any) (string, error)
-}
-
 // AlertStore defines the persistence interface for alerts.
 type AlertStore interface {
 	InsertAlert(ctx context.Context, a *Alert) (int64, error)

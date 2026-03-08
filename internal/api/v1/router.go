@@ -467,7 +467,6 @@ func (r *Router) handleGetEdition(smtpConfigured bool) http.HandlerFunc {
 				"alert_escalation":    isEnterprise,
 				"alert_routing":       true,
 				"alert_entity_routing": isEnterprise,
-				"alert_templates":     isEnterprise,
 				"security_posture":    isEnterprise,
 			},
 		})
