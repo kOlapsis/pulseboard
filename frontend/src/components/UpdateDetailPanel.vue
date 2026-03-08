@@ -12,15 +12,15 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useUpdatesStore } from '@/stores/updates'
-import { fetchContainerUpdate, type ContainerUpdateDetail } from '@/services/updateApi'
+import { type ContainerUpdateDetail, fetchContainerUpdate } from '@/services/updateApi'
 import { useEdition } from '@/composables/useEdition'
 import RiskScoreGauge from '@/components/RiskScoreGauge.vue'
 import CveList from '@/components/CveList.vue'
 import ChangelogViewer from '@/components/ChangelogViewer.vue'
 import FeatureGate from '@/components/FeatureGate.vue'
-import { Copy, Check, Pin, PinOff, ArrowRight, ExternalLink, AlertTriangle } from 'lucide-vue-next'
+import { AlertTriangle, ArrowRight, Check, Copy, ExternalLink, Pin, PinOff } from 'lucide-vue-next'
 
 const { hasFeature } = useEdition()
 
@@ -64,7 +64,9 @@ async function copyCommand() {
   try {
     await navigator.clipboard.writeText(detail.value.update_command)
     copied.value = true
-    setTimeout(() => { copied.value = false }, 2000)
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
   } catch {
     // fallback
   }
@@ -75,7 +77,9 @@ async function copyRollbackCommand() {
   try {
     await navigator.clipboard.writeText(detail.value.rollback_command)
     copiedRollback.value = true
-    setTimeout(() => { copiedRollback.value = false }, 2000)
+    setTimeout(() => {
+      copiedRollback.value = false
+    }, 2000)
   } catch {
     // fallback
   }
@@ -101,7 +105,9 @@ onMounted(loadDetail)
 
 <template>
   <div v-if="loading" class="flex items-center justify-center py-12">
-    <div class="w-6 h-6 border-2 border-pb-green-500 border-t-transparent rounded-full animate-spin" />
+    <div
+      class="w-6 h-6 border-2 border-pb-green-500 border-t-transparent rounded-full animate-spin"
+    />
   </div>
 
   <div v-else-if="detail" class="space-y-5">
@@ -111,7 +117,9 @@ onMounted(loadDetail)
       <div class="flex items-center gap-3">
         <div class="text-center">
           <p class="text-xs text-slate-500 mb-0.5">Current</p>
-          <p class="text-sm font-bold text-slate-200 font-mono">{{ detail.current_tag || 'latest' }}</p>
+          <p class="text-sm font-bold text-slate-200 font-mono">
+            {{ detail.current_tag || 'latest' }}
+          </p>
         </div>
         <ArrowRight :size="16" class="text-pb-green-500 shrink-0" />
         <div class="text-center">
@@ -128,8 +136,12 @@ onMounted(loadDetail)
             'bg-pb-green-500/10 text-pb-green-400': detail.update_type === 'patch',
             'bg-slate-500/10 text-slate-400': detail.update_type === 'digest_only',
           }"
-        >{{ detail.update_type }}</span>
-        <span v-if="detail.pinned" class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">
+          >{{ detail.update_type }}</span
+        >
+        <span
+          v-if="detail.pinned"
+          class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400"
+        >
           <Pin :size="8" class="inline mr-0.5" /> Pinned
         </span>
       </div>
@@ -139,8 +151,15 @@ onMounted(loadDetail)
     </div>
 
     <!-- 2. Breaking changes warning -->
-    <FeatureGate feature="changelog" title="Breaking Changes" description="Know before you break. Breaking changes are detected automatically so you can plan your update safely.">
-      <div v-if="detail.has_breaking_changes" class="bg-rose-500/5 rounded-xl p-4 border border-rose-500/20">
+    <FeatureGate
+      feature="changelog"
+      title="Breaking Changes"
+      description="Know before you break. Breaking changes are detected automatically so you can plan your update safely."
+    >
+      <div
+        v-if="detail.has_breaking_changes"
+        class="bg-rose-500/5 rounded-xl p-4 border border-rose-500/20"
+      >
         <div class="flex items-center gap-2">
           <AlertTriangle :size="14" class="text-rose-400 shrink-0" />
           <h4 class="text-xs font-bold text-rose-400">Breaking Changes Detected</h4>
@@ -152,15 +171,25 @@ onMounted(loadDetail)
     </FeatureGate>
 
     <!-- 3. Risk Score (Pro) -->
-    <FeatureGate feature="risk_scoring" title="Risk Score" description="Instantly assess the risk of each update. A smart score combines CVE severity, breaking changes, and version jump to help you prioritize.">
+    <FeatureGate
+      feature="risk_scoring"
+      title="Risk Score"
+      description="Instantly assess the risk of each update. A smart score combines CVE severity, breaking changes, and version jump to help you prioritize."
+    >
       <div v-if="detail.risk_score > 0" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Risk Score</h4>
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+          Risk Score
+        </h4>
         <RiskScoreGauge :score="detail.risk_score" :level="riskLevel" />
       </div>
     </FeatureGate>
 
     <!-- 4. Changelog (Pro) -->
-    <FeatureGate feature="changelog" title="Changelog" description="Read what changed before you update. Changelogs are fetched automatically with breaking changes highlighted.">
+    <FeatureGate
+      feature="changelog"
+      title="Changelog"
+      description="Read what changed before you update. Changelogs are fetched automatically with breaking changes highlighted."
+    >
       <div v-if="detail.changelog_url || detail.changelog_summary">
         <ChangelogViewer
           :changelog-url="detail.changelog_url"
@@ -172,9 +201,15 @@ onMounted(loadDetail)
     </FeatureGate>
 
     <!-- 5. CVEs (Pro) -->
-    <FeatureGate feature="cve_enrichment" title="Vulnerabilities (CVE)" description="See at a glance if your containers are exposed to known vulnerabilities. CVEs are automatically matched and ranked by severity.">
+    <FeatureGate
+      feature="cve_enrichment"
+      title="Vulnerabilities (CVE)"
+      description="See at a glance if your containers are exposed to known vulnerabilities. CVEs are automatically matched and ranked by severity."
+    >
       <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Vulnerabilities (CVE)</h4>
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+          Vulnerabilities (CVE)
+        </h4>
         <CveList :cves="detail.active_cves || []" />
       </div>
     </FeatureGate>
@@ -182,7 +217,9 @@ onMounted(loadDetail)
     <!-- 6. Update command -->
     <div v-if="detail.update_command" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
       <div class="flex items-center justify-between mb-2">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Update Command</h4>
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          Update Command
+        </h4>
         <button
           @click="copyCommand"
           class="text-[10px] text-pb-green-500 hover:text-pb-green-400 flex items-center gap-1 transition-colors"
@@ -191,13 +228,21 @@ onMounted(loadDetail)
           {{ copied ? 'Copied!' : 'Copy' }}
         </button>
       </div>
-      <pre class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono">{{ detail.update_command }}</pre>
+      <pre
+        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono"
+        >{{ detail.update_command }}</pre
+      >
     </div>
 
     <!-- 7. Rollback command -->
-    <div v-if="detail.rollback_command" class="bg-[#0B0E13] rounded-xl p-4 border border-amber-900/30">
+    <div
+      v-if="detail.rollback_command"
+      class="bg-[#0B0E13] rounded-xl p-4 border border-amber-900/30"
+    >
       <div class="flex items-center justify-between mb-2">
-        <h4 class="text-[10px] font-bold text-amber-500/80 uppercase tracking-widest">Rollback Command</h4>
+        <h4 class="text-[10px] font-bold text-amber-500/80 uppercase tracking-widest">
+          Rollback Command
+        </h4>
         <button
           @click="copyRollbackCommand"
           class="text-[10px] text-amber-500 hover:text-amber-400 flex items-center gap-1 transition-colors"
@@ -206,14 +251,28 @@ onMounted(loadDetail)
           {{ copiedRollback ? 'Copied!' : 'Copy' }}
         </button>
       </div>
-      <pre class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono">{{ detail.rollback_command }}</pre>
-      <p class="text-[9px] text-slate-600 mt-2">Digest availability depends on registry retention policies.</p>
+      <pre
+        class="text-[11px] text-slate-300 bg-[#0a0c10] rounded-lg p-3 overflow-x-auto font-mono"
+        >{{ detail.rollback_command }}</pre
+      >
+      <p class="text-[9px] text-slate-600 mt-2">
+        Digest availability depends on registry retention policies.
+      </p>
     </div>
 
     <!-- 8. Previous digest (Pro) -->
-    <FeatureGate feature="cve_enrichment" title="Previous Digest" description="Keep a rollback safety net. The previous image digest is saved so you can revert in seconds if an update goes wrong.">
-      <div v-if="detail.previous_digest" class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Previous Digest</h4>
+    <FeatureGate
+      feature="cve_enrichment"
+      title="Previous Digest"
+      description="Keep a rollback safety net. The previous image digest is saved so you can revert in seconds if an update goes wrong."
+    >
+      <div
+        v-if="detail.previous_digest"
+        class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800"
+      >
+        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+          Previous Digest
+        </h4>
         <p class="text-[10px] text-slate-400 font-mono break-all">{{ detail.previous_digest }}</p>
       </div>
     </FeatureGate>
@@ -223,16 +282,19 @@ onMounted(loadDetail)
       <!-- Pin / Unpin -->
       <div>
         <button
+          v-if="!showPinInput || detail.pinned"
           @click="handlePin"
           class="w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
-          :class="detail.pinned
-            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-            : 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/20'"
+          :class="
+            detail.pinned
+              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              : 'bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/20'
+          "
         >
           <component :is="detail.pinned ? PinOff : Pin" :size="13" />
           {{ detail.pinned ? 'Unpin this version' : 'Pin this version' }}
         </button>
-        <div v-if="showPinInput && !detail.pinned" class="mt-2">
+        <div v-if="showPinInput && !detail.pinned">
           <textarea
             v-model="pinReason"
             rows="2"

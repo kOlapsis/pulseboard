@@ -4,10 +4,12 @@ one of these licenses. AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.html Comm
 LICENSE-COMMERCIAL.md Source: https://github.com/kolapsis/maintenant -->
 
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { computed, onMounted, ref } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, provide, ref } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
+import DetailSlideOver from '@/components/DetailSlideOver.vue'
 import { useAppVersion } from '@/composables/useAppVersion'
+import { useDetailSlideOver, detailSlideOverKey, parseSelectedParam } from '@/composables/useDetailSlideOver'
 import { useEdition } from '@/composables/useEdition'
 import {
   Activity,
@@ -26,11 +28,24 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
+const router = useRouter()
 const { version } = useAppVersion()
 const { isEnterprise, hasFeature, licenseMessage, licenseStatusValue, loadLicenseStatus } = useEdition()
 
+const detailSlideOver = useDetailSlideOver()
+provide(detailSlideOverKey, detailSlideOver)
+
 onMounted(() => {
   loadLicenseStatus()
+  // Parse ?selected=<type>-<id> on initial load
+  const parsed = parseSelectedParam(route.query.selected)
+  if (parsed) {
+    detailSlideOver.openDetail(parsed.type, parsed.id)
+  } else if (route.query.selected) {
+    // Invalid format — silently remove
+    const { selected: _, ...rest } = route.query
+    router.replace({ query: rest })
+  }
 })
 
 const mobileMenuOpen = ref(false)
@@ -215,6 +230,9 @@ const mainNav = computed(() => allNav.filter(item => !item.feature || hasFeature
         </RouterView>
       </div>
     </main>
+
+    <!-- Global detail slide-over -->
+    <DetailSlideOver />
   </div>
 </template>
 

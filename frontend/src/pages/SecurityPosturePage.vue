@@ -12,38 +12,28 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { inject, onMounted, onUnmounted, computed } from 'vue'
 import { usePostureStore } from '@/stores/posture'
 import { useContainersStore } from '@/stores/containers'
 import { useEdition } from '@/composables/useEdition'
 import { timeAgo } from '@/utils/time'
 import PostureScoreBadge from '@/components/PostureScoreBadge.vue'
 import PostureContainerList from '@/components/PostureContainerList.vue'
-import SlideOverPanel from '@/components/ui/SlideOverPanel.vue'
-import ContainerDetail from '@/components/ContainerDetail.vue'
 import FeatureGate from '@/components/FeatureGate.vue'
+import { detailSlideOverKey } from '@/composables/useDetailSlideOver'
 import { ShieldCheck, AlertTriangle } from 'lucide-vue-next'
 
 const { hasFeature } = useEdition()
 const store = usePostureStore()
 const containerStore = useContainersStore()
+const { openDetail } = inject(detailSlideOverKey)!
 
 const isAvailable = computed(() => hasFeature('security_posture'))
 const posture = computed(() => store.posture)
 
-const detailOpen = ref(false)
-const selectedContainerId = ref<number | null>(null)
-
-function openDetail(containerId: number) {
-  selectedContainerId.value = containerId
-  detailOpen.value = true
+function handleSelectContainer(containerId: number) {
+  openDetail('container', containerId)
 }
-
-const selectedContainerName = computed(() => {
-  if (!selectedContainerId.value) return ''
-  const c = containerStore.allContainers.find(ct => ct.id === selectedContainerId.value)
-  return c?.name ?? ''
-})
 
 onMounted(() => {
   if (isAvailable.value) {
@@ -125,7 +115,7 @@ onUnmounted(() => {
           <!-- Top risks -->
           <div v-if="posture.top_risks.length > 0">
             <h2 class="text-sm font-bold text-white mb-3">Top Risks</h2>
-            <PostureContainerList :risks="posture.top_risks" @select="openDetail" />
+            <PostureContainerList :risks="posture.top_risks" @select="handleSelectContainer" />
           </div>
         </template>
 
@@ -138,22 +128,6 @@ onUnmounted(() => {
 
       </FeatureGate>
 
-      <!-- Container detail slide-over -->
-      <SlideOverPanel
-        v-model:open="detailOpen"
-        :title="selectedContainerName"
-        width="max-w-2xl"
-      >
-        <template #header>
-          <span></span>
-        </template>
-        <ContainerDetail
-          v-if="selectedContainerId"
-          :container-id="selectedContainerId"
-          @close="detailOpen = false"
-          @deleted="detailOpen = false"
-        />
-      </SlideOverPanel>
     </div>
   </div>
 </template>

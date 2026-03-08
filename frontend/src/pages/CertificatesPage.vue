@@ -12,20 +12,18 @@
 -->
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { inject, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCertificatesStore } from '@/stores/certificates'
 import { useContainersStore } from '@/stores/containers'
 import { createCertificate } from '@/services/certificateApi'
 import CertificateCard from '@/components/CertificateCard.vue'
-import CertificateDetail from '@/components/CertificateDetail.vue'
+import { detailSlideOverKey } from '@/composables/useDetailSlideOver'
 
-const route = useRoute()
 const store = useCertificatesStore()
 const containers = useContainersStore()
+const { openDetail } = inject(detailSlideOverKey)!
 const isK8s = computed(() => containers.runtimeName === 'kubernetes')
 const labelOrAnnotation = computed(() => isK8s.value ? 'annotation' : 'label')
-const selectedId = ref<number | null>(null)
 const showCreateForm = ref(false)
 const createError = ref<string | null>(null)
 
@@ -82,24 +80,9 @@ async function handleCreate() {
   }
 }
 
-function openDetail(id: number) {
-  selectedId.value = id
+function handleSelect(id: number) {
+  openDetail('certificate', id)
 }
-
-function closeDetail() {
-  selectedId.value = null
-}
-
-// Auto-open certificate from query param (e.g. ?selected=42)
-watch(
-  () => [route.query.selected, store.certificates.length] as const,
-  ([selected]) => {
-    if (selected && store.certificates.length > 0) {
-      openDetail(Number(selected))
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
@@ -275,13 +258,6 @@ watch(
       </button>
     </div>
 
-    <!-- Slide-over detail -->
-    <CertificateDetail
-      v-if="selectedId"
-      :certificate-id="selectedId"
-      @close="closeDetail"
-    />
-
     <!-- Loading -->
     <div v-if="store.loading" class="py-12 text-center" :style="{ color: 'var(--pb-text-muted)' }">
       Loading certificates...
@@ -331,7 +307,7 @@ watch(
           :key="cert.id"
           :certificate="cert"
           @refresh="store.fetchCertificates()"
-          @select="openDetail($event)"
+          @select="handleSelect($event)"
         />
       </div>
     </div>

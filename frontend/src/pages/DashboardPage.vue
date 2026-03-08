@@ -12,9 +12,10 @@
 -->
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { inject, onMounted, onUnmounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDashboardStore, type UnifiedMonitor } from '@/stores/dashboard'
+import { detailSlideOverKey, type EntityType } from '@/composables/useDetailSlideOver'
 import { useResourcesStore } from '@/stores/resources'
 import { useAlertsStore } from '@/stores/alerts'
 import { useStatusAdminStore } from '@/stores/statusAdmin'
@@ -43,6 +44,7 @@ import {
 const { hasFeature } = useEdition()
 
 const router = useRouter()
+const detailSlideOver = inject(detailSlideOverKey)!
 const dashboard = useDashboardStore()
 const resources = useResourcesStore()
 const alertsStore = useAlertsStore()
@@ -152,16 +154,20 @@ function gaugeBarColor(val: number, thresholds = { warn: 60, crit: 80 }): string
 }
 
 // Unified incident feed: active alerts + status page incidents
+interface IncidentFeedItem {
+  id: string
+  service: string
+  message: string
+  time: string
+  color: string
+  icon: string
+  route: string
+  entityType: EntityType | null
+  entityId: string | null
+}
+
 const incidentFeed = computed(() => {
-  const items: {
-    id: string
-    service: string
-    message: string
-    time: string
-    color: string
-    icon: string
-    route: string
-  }[] = []
+  const items: IncidentFeedItem[] = []
 
   // Collect all active alerts (deduplicated, sorted by fired_at desc)
   const allActive: Alert[] = [
@@ -176,6 +182,8 @@ const incidentFeed = computed(() => {
       alert.severity === 'warning'  ? 'bg-amber-500' :
       'bg-pb-green-500'
     const route = alertEntityRoute(alert)
+    const entityId = alertEntityId(alert)
+    const entityType = alertEntityType(alert)
     items.push({
       id: `alert-${alert.id}`,
       service: alert.entity_name || alert.source || `Alert #${alert.id}`,
@@ -184,6 +192,8 @@ const incidentFeed = computed(() => {
       color,
       icon: 'alert',
       route,
+      entityType,
+      entityId,
     })
   }
 
@@ -202,6 +212,8 @@ const incidentFeed = computed(() => {
       color,
       icon: 'status',
       route: '/status-admin',
+      entityType: null,
+      entityId: null,
     })
   }
 
@@ -209,6 +221,15 @@ const incidentFeed = computed(() => {
 })
 
 function alertEntityRoute(alert: Alert): string {
+  // Route by source first — some sources (update, security) have entity_type
+  // "container" but should navigate to their dedicated page instead.
+  switch (alert.source) {
+    case 'update': return '/updates'
+    case 'security':
+      if (alert.entity_type === 'infrastructure') return '/security'
+      return hasFeature('security_posture') ? '/security' : '/containers'
+  }
+  // Default: route by entity type
   switch (alert.entity_type) {
     case 'container': return '/containers'
     case 'endpoint': return '/endpoints'
@@ -218,8 +239,28 @@ function alertEntityRoute(alert: Alert): string {
   }
 }
 
-function navigateToIncident(inc: { route: string }) {
-  router.push(inc.route)
+function alertEntityId(alert: Alert): string | null {
+  const supported = ['container', 'heartbeat', 'certificate']
+  if (supported.includes(alert.entity_type) && alert.entity_id) {
+    return String(alert.entity_id)
+  }
+  return null
+}
+
+function alertEntityType(alert: Alert): EntityType | null {
+  const supported: EntityType[] = ['container', 'heartbeat', 'certificate']
+  if (supported.includes(alert.entity_type as EntityType) && alert.entity_id) {
+    return alert.entity_type as EntityType
+  }
+  return null
+}
+
+function navigateToIncident(inc: IncidentFeedItem) {
+  if (inc.entityType && inc.entityId) {
+    detailSlideOver.openDetail(inc.entityType, Number(inc.entityId))
+  } else {
+    router.push(inc.route)
+  }
 }
 
 const formatRelativeTime = timeAgo

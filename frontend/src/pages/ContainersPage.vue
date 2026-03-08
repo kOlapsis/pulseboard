@@ -12,21 +12,18 @@
 -->
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { inject, ref, computed } from 'vue'
 import ContainerList from '@/components/ContainerList.vue'
-import ContainerDetail from '@/components/ContainerDetail.vue'
 import ResourceSummary from '@/components/ResourceSummary.vue'
-import SlideOverPanel from '@/components/ui/SlideOverPanel.vue'
 import { useContainersStore } from '@/stores/containers'
 import { useUpdatesStore } from '@/stores/updates'
+import { detailSlideOverKey } from '@/composables/useDetailSlideOver'
 import type { Container } from '@/services/containerApi'
 import { AlertTriangle, Info } from 'lucide-vue-next'
 
-const route = useRoute()
-const router = useRouter()
 const store = useContainersStore()
 const updatesStore = useUpdatesStore()
+const { openDetail } = inject(detailSlideOverKey)!
 
 updatesStore.fetchAllUpdates()
 const isK8s = computed(() => store.runtimeName === 'kubernetes')
@@ -38,32 +35,9 @@ function dismissLabelTips() {
   localStorage.setItem('pb:hideLabelTips', '1')
 }
 
-const selectedContainer = ref<Container | null>(null)
-const detailOpen = ref(false)
-
-function openDetail(container: Container) {
-  selectedContainer.value = container
-  detailOpen.value = true
+function handleSelect(container: Container) {
+  openDetail('container', container.id)
 }
-
-function openContainerById(id: number) {
-  const container = store.allContainers.find((c) => c.id === id)
-  if (container) {
-    openDetail(container)
-    router.replace({ query: {} })
-  }
-}
-
-// Auto-open container from query param (e.g. ?selected=42)
-watch(
-  () => [route.query.selected, store.allContainers.length] as const,
-  ([selected]) => {
-    if (selected && store.allContainers.length > 0) {
-      openContainerById(Number(selected))
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
@@ -120,24 +94,8 @@ watch(
     </div>
 
     <ResourceSummary />
-    <ContainerList @select="openDetail" />
+    <ContainerList @select="handleSelect" />
 
-    <!-- Container detail slide-over -->
-    <SlideOverPanel
-      v-model:open="detailOpen"
-      :title="selectedContainer?.name || ''"
-      width="max-w-2xl"
-    >
-      <template #header>
-        <span></span>
-      </template>
-      <ContainerDetail
-        v-if="selectedContainer"
-        :container-id="selectedContainer.id"
-        @close="detailOpen = false"
-        @deleted="detailOpen = false; store.fetchContainers()"
-      />
-    </SlideOverPanel>
   </div>
   </div>
 </template>

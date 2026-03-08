@@ -12,27 +12,15 @@
 -->
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { inject, ref, onMounted, onUnmounted } from 'vue'
 import { useHeartbeatsStore } from '@/stores/heartbeats'
 import { createHeartbeat } from '@/services/heartbeatApi'
 import HeartbeatCard from '@/components/HeartbeatCard.vue'
-import HeartbeatDetail from '@/components/HeartbeatDetail.vue'
+import { detailSlideOverKey } from '@/composables/useDetailSlideOver'
 
-const route = useRoute()
 const store = useHeartbeatsStore()
-const selectedId = ref<number | null>(null)
+const { openDetail } = inject(detailSlideOverKey)!
 
-// Auto-open heartbeat from query param (e.g. ?selected=42)
-watch(
-  () => [route.query.selected, store.heartbeats.length] as const,
-  ([selected]) => {
-    if (selected && store.heartbeats.length > 0) {
-      selectedId.value = Number(selected)
-    }
-  },
-  { immediate: true },
-)
 const showCreateForm = ref(false)
 const createError = ref<string | null>(null)
 
@@ -222,14 +210,6 @@ async function handleCreate() {
       </span>
     </div>
 
-    <!-- Detail view -->
-    <HeartbeatDetail
-      v-if="selectedId"
-      :heartbeat-id="selectedId"
-      class="mb-6"
-      @close="selectedId = null"
-    />
-
     <!-- Loading -->
     <div v-if="store.loading" class="py-12 text-center" :style="{ color: 'var(--pb-text-muted)' }">
       Loading heartbeats...
@@ -282,7 +262,7 @@ async function handleCreate() {
         :key="hb.id"
         :heartbeat="hb"
         @refresh="store.fetchHeartbeats()"
-        @select="selectedId = $event"
+        @select="openDetail('heartbeat', $event)"
       />
     </div>
   </div>

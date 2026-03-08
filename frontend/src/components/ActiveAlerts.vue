@@ -12,26 +12,20 @@
 -->
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, inject } from 'vue'
 import { useAlertsStore } from '@/stores/alerts'
+import { detailSlideOverKey, type EntityType } from '@/composables/useDetailSlideOver'
 import { timeAgo } from '@/utils/time'
 import type { Alert } from '@/services/alertApi'
 
-const router = useRouter()
+const detailSlideOver = inject(detailSlideOverKey)!
 const store = useAlertsStore()
 
-function navigateToEntity(alert: Alert) {
-  const routes: Record<string, string> = {
-    container: 'containers',
-    endpoint: 'endpoints',
-    heartbeat: 'heartbeats',
-    certificate: 'certificates',
-  }
-  const name = routes[alert.entity_type]
-  if (!name) return
-  const query = alert.entity_id ? { selected: String(alert.entity_id) } : undefined
-  router.push({ name, query })
+const ENTITY_TYPES: ReadonlySet<string> = new Set(['container', 'endpoint', 'heartbeat', 'certificate'])
+
+function openEntityDetail(alert: Alert) {
+  if (!alert.entity_id || !ENTITY_TYPES.has(alert.entity_type)) return
+  detailSlideOver.openDetail(alert.entity_type as EntityType, alert.entity_id)
 }
 
 const severityConfig: Record<string, { label: string; color: string; bg: string; dot: string }> = {
@@ -96,7 +90,7 @@ const sections = computed(() =>
               background: section.config.bg,
               borderColor: section.config.color,
             }"
-            @click="navigateToEntity(alert)"
+            @click="openEntityDetail(alert)"
           >
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">

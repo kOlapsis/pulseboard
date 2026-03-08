@@ -15,7 +15,6 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { getCertificate, type CertificateDetailResponse, type CertChainEntry } from '@/services/certificateApi'
 import CertificateStatusBadge from './CertificateStatusBadge.vue'
-import SlideOverPanel from './ui/SlideOverPanel.vue'
 
 const props = defineProps<{
   certificateId: number
@@ -25,7 +24,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const panelOpen = ref(true)
 const detail = ref<CertificateDetailResponse | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -43,16 +41,7 @@ async function load() {
 }
 
 onMounted(load)
-watch(() => props.certificateId, () => {
-  panelOpen.value = true
-  load()
-})
-
-watch(panelOpen, (val) => {
-  if (!val) {
-    emit('close')
-  }
-})
+watch(() => props.certificateId, load)
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '-'
@@ -110,7 +99,7 @@ function countdownBgColor(days: number | undefined): string {
 </script>
 
 <template>
-  <SlideOverPanel v-model:open="panelOpen" title="Certificate Details">
+  <div>
     <div v-if="loading" class="py-8 text-center" :style="{ color: 'var(--pb-text-muted)' }">Loading...</div>
     <div
       v-else-if="error"
@@ -273,5 +262,5 @@ function countdownBgColor(days: number | undefined): string {
         </div>
       </div>
     </div>
-  </SlideOverPanel>
+  </div>
 </template>
