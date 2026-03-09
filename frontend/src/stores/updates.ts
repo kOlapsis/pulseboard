@@ -56,18 +56,10 @@ export const useUpdatesStore = defineStore('updates', () => {
     scanning.value = true
   }
 
-  function onScanCompleted(e: MessageEvent) {
+  function onScanCompleted() {
     scanning.value = false
-    let data
-    try {
-      data = JSON.parse(e.data)
-    } catch {
-      return
-    }
-    if (data.updates_found > 0) {
-      fetchSummary()
-      fetchAllUpdates()
-    }
+    fetchSummary()
+    fetchAllUpdates()
   }
 
   function onDetected(e: MessageEvent) {
