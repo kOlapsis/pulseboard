@@ -26,6 +26,7 @@ type CertificateStore interface {
 	ListMonitors(ctx context.Context, opts ListCertificatesOpts) ([]*CertMonitor, error)
 	UpdateMonitor(ctx context.Context, m *CertMonitor) error
 	SoftDeleteMonitor(ctx context.Context, id int64) error
+	ReactivateMonitor(ctx context.Context, id int64, m *CertMonitor) error
 
 	// Check results
 	InsertCheckResult(ctx context.Context, result *CertCheckResult) (int64, error)

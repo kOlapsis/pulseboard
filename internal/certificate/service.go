@@ -199,13 +199,6 @@ func (s *Service) CreateStandalone(ctx context.Context, input CreateCertificateI
 	if err != nil {
 		return nil, nil, fmt.Errorf("check existing: %w", err)
 	}
-	if existing != nil {
-		if existing.Source == SourceAuto {
-			return nil, nil, ErrAutoDetectedMonitor
-		}
-		return nil, nil, ErrDuplicateMonitor
-	}
-
 	monitor := &CertMonitor{
 		Hostname:             input.Hostname,
 		Port:                 input.Port,
@@ -215,9 +208,23 @@ func (s *Service) CreateStandalone(ctx context.Context, input CreateCertificateI
 		WarningThresholds:    input.WarningThresholds,
 	}
 
-	_, err = s.store.CreateMonitor(ctx, monitor)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create standalone monitor: %w", err)
+	if existing != nil {
+		if existing.Active {
+			if existing.Source == SourceAuto {
+				return nil, nil, ErrAutoDetectedMonitor
+			}
+			return nil, nil, ErrDuplicateMonitor
+		}
+		// Reactivate the soft-deleted monitor with the new settings.
+		monitor.ID = existing.ID
+		if err := s.store.ReactivateMonitor(ctx, existing.ID, monitor); err != nil {
+			return nil, nil, fmt.Errorf("reactivate monitor: %w", err)
+		}
+	} else {
+		_, err = s.store.CreateMonitor(ctx, monitor)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create standalone monitor: %w", err)
+		}
 	}
 
 	s.emit(event.CertificateCreated, map[string]interface{}{
@@ -328,11 +335,6 @@ func (s *Service) SyncFromLabels(ctx context.Context, containerExternalID string
 			continue
 		}
 
-		if existing != nil {
-			s.logger.Debug("certificate: label monitor exists, skipping", "hostname", p.Hostname, "port", p.Port)
-			continue
-		}
-
 		monitor := &CertMonitor{
 			Hostname:             p.Hostname,
 			Port:                 p.Port,
@@ -341,6 +343,18 @@ func (s *Service) SyncFromLabels(ctx context.Context, containerExternalID string
 			Status:               StatusUnknown,
 			CheckIntervalSeconds: 43200,
 			WarningThresholds:    DefaultWarningThresholds(),
+		}
+
+		if existing != nil {
+			if existing.Active {
+				s.logger.Debug("certificate: label monitor exists, skipping", "hostname", p.Hostname, "port", p.Port)
+				continue
+			}
+			// Reactivate the soft-deleted monitor.
+			if err := s.store.ReactivateMonitor(ctx, existing.ID, monitor); err != nil {
+				s.logger.Error("reactivate label cert monitor", "error", err, "hostname", p.Hostname, "port", p.Port)
+			}
+			continue
 		}
 
 		if _, err := s.store.CreateMonitor(ctx, monitor); err != nil {
