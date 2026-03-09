@@ -1,8 +1,11 @@
+# Apply with: kubectl apply -n <your-namespace> -f rbac.yaml
+# The ServiceAccount is created in the target namespace automatically.
+# The ClusterRoleBinding references it, so update the namespace below
+# if you are NOT using "maintenant" as your namespace.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: maintenant
-  namespace: maintenant
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -17,7 +20,7 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
-  # Metrics — read-only
+  # Metrics — read-only (requires metrics-server)
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods"]
     verbs: ["get", "list"]
@@ -33,4 +36,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: maintenant
-    namespace: maintenant
+    namespace: maintenant # ← change this to match your namespace
