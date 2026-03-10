@@ -11,7 +11,7 @@
   Source: https://github.com/kolapsis/maintenant
 */
 
-import { ref, watch, nextTick, type Ref } from 'vue'
+import { ref, watch, watchEffect, nextTick, type Ref } from 'vue'
 import { parseAnsi, type AnsiToken } from './useAnsiParser'
 import { detectLogLevel, parseJsonLine, parseTimestamp } from './useLogParser'
 
@@ -24,6 +24,7 @@ export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' |
 export interface LogLine {
   id: number
   raw: string
+  text: string // ANSI-stripped plain text (for search matching)
   tokens: AnsiToken[]
   stream: string
   timestamp: string | null
@@ -45,8 +46,8 @@ export interface UseLogStreamReturn {
   unseenCount: Ref<number>
   wordWrap: Ref<boolean>
   error: Ref<string | null>
+  scrollContainerRef: Ref<HTMLElement | null>
   scrollToBottom: () => void
-  setScrollContainer: (el: HTMLElement | null) => void
   handleScroll: (event: Event) => void
   connect: () => void
   disconnect: () => void
@@ -70,15 +71,17 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
 
   let nextLineId = 1
   let eventSource: EventSource | null = null
-  let scrollContainer: HTMLElement | null = null
+  const scrollContainerRef = ref<HTMLElement | null>(null)
 
   function buildLine(raw: string, stream = 'stdout', timestamp: string | null = null): LogLine {
     const cleaned = stripBinary(raw)
     const jsonResult = parseJsonLine(cleaned)
+    const tokens = parseAnsi(cleaned)
     return {
       id: nextLineId++,
       raw: cleaned,
-      tokens: parseAnsi(cleaned),
+      text: tokens.map(t => t.text).join(''),
+      tokens,
       stream,
       timestamp,
       level: detectLogLevel(cleaned),
@@ -96,34 +99,39 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
       lines.value = lines.value.slice(-TRIM_TO)
     }
 
-    if (autoScroll.value) {
-      doScrollToBottom()
-    } else {
+    if (!autoScroll.value) {
       unseenCount.value++
     }
   }
 
-  function doScrollToBottom() {
-    nextTick(() => {
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    })
-  }
+  // Auto-scroll after DOM updates. watchEffect tracks all three dependencies:
+  // lines.value.length, autoScroll.value, and scrollContainerRef.value.
+  // If the scroll container mounts AFTER lines change (v-else timing),
+  // the watchEffect re-fires when scrollContainerRef becomes non-null.
+  // flush: 'post' guarantees the DOM is fully rendered before we read scrollHeight.
+  let lastScrolledLength = 0
+  watchEffect(() => {
+    const len = lines.value.length
+    const el = scrollContainerRef.value
+    if (autoScroll.value && el && len > 0 && len !== lastScrolledLength) {
+      lastScrolledLength = len
+      el.scrollTop = el.scrollHeight
+    }
+  }, { flush: 'post' })
 
   function scrollToBottom() {
     autoScroll.value = true
     unseenCount.value = 0
-    doScrollToBottom()
-  }
-
-  function setScrollContainer(el: HTMLElement | null) {
-    scrollContainer = el
+    nextTick(() => {
+      const el = scrollContainerRef.value
+      if (el) {
+        el.scrollTop = el.scrollHeight
+      }
+    })
   }
 
   function handleScroll(event: Event) {
-    const el = event.target as HTMLElement
-    scrollContainer = el
+    const el = event.currentTarget as HTMLElement
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30
     if (atBottom && !autoScroll.value) {
       autoScroll.value = true
@@ -165,9 +173,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
           lines.value = []
           for (const raw of data.lines) {
             lines.value.push(buildLine(raw))
-          }
-          if (autoScroll.value) {
-            doScrollToBottom()
           }
         }
       } catch {
@@ -219,9 +224,6 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
         lines.value.push(buildLine(raw))
       }
       status.value = 'closed'
-      if (autoScroll.value) {
-        doScrollToBottom()
-      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to fetch logs'
       status.value = 'error'
@@ -252,8 +254,8 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     unseenCount,
     wordWrap,
     error,
+    scrollContainerRef,
     scrollToBottom,
-    setScrollContainer,
     handleScroll,
     connect,
     disconnect,

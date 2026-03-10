@@ -12,7 +12,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch, watchEffect, nextTick } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import type { UseLogStreamReturn } from '@/composables/useLogStream'
 import type { UseLogSearchReturn } from '@/composables/useLogSearch'
 import LogToolbar from './LogToolbar.vue'
@@ -30,11 +30,6 @@ const emit = defineEmits<{
 }>()
 
 const expandedJsonIds = ref(new Set<number>())
-const scrollContainerRef = ref<HTMLElement | null>(null)
-
-watchEffect(() => {
-  props.logStream.setScrollContainer(scrollContainerRef.value)
-})
 
 const hasTimestamps = computed(() =>
   props.logStream.lines.value.some(l => l.parsedTimestamp !== null),
@@ -66,7 +61,7 @@ watch(() => props.search.currentMatchIndex.value, () => {
   if (!match) return
 
   nextTick(() => {
-    const container = scrollContainerRef.value
+    const container = props.logStream.scrollContainerRef.value
     if (!container) return
     const lineEl = container.querySelector(`[data-line-index="${match.lineIndex}"]`)
     if (lineEl) {
@@ -122,7 +117,7 @@ watch(() => props.logStream.lines.value.length, (newLen, oldLen) => {
     <!-- Log content -->
     <div v-else class="relative min-h-0 flex-1">
       <div
-        ref="scrollContainerRef"
+        :ref="(el: any) => { logStream.scrollContainerRef.value = el }"
         class="absolute inset-0 overflow-auto rounded-b-xl border border-t-0 border-slate-800 bg-[#0B0E13] px-2 py-1 font-mono text-[0.7rem] leading-relaxed text-white"
         :class="logStream.wordWrap.value ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'"
         @scroll="logStream.handleScroll"
