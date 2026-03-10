@@ -12,7 +12,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, watchEffect, nextTick } from 'vue'
 import type { UseLogStreamReturn } from '@/composables/useLogStream'
 import type { UseLogSearchReturn } from '@/composables/useLogSearch'
 import LogToolbar from './LogToolbar.vue'
@@ -31,6 +31,10 @@ const emit = defineEmits<{
 
 const expandedJsonIds = ref(new Set<number>())
 const scrollContainerRef = ref<HTMLElement | null>(null)
+
+watchEffect(() => {
+  props.logStream.setScrollContainer(scrollContainerRef.value)
+})
 
 const hasTimestamps = computed(() =>
   props.logStream.lines.value.some(l => l.parsedTimestamp !== null),

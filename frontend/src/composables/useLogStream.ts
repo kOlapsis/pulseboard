@@ -46,6 +46,7 @@ export interface UseLogStreamReturn {
   wordWrap: Ref<boolean>
   error: Ref<string | null>
   scrollToBottom: () => void
+  setScrollContainer: (el: HTMLElement | null) => void
   handleScroll: (event: Event) => void
   connect: () => void
   disconnect: () => void
@@ -114,6 +115,10 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     autoScroll.value = true
     unseenCount.value = 0
     doScrollToBottom()
+  }
+
+  function setScrollContainer(el: HTMLElement | null) {
+    scrollContainer = el
   }
 
   function handleScroll(event: Event) {
@@ -248,6 +253,7 @@ export function useLogStream(options: UseLogStreamOptions): UseLogStreamReturn {
     wordWrap,
     error,
     scrollToBottom,
+    setScrollContainer,
     handleScroll,
     connect,
     disconnect,
