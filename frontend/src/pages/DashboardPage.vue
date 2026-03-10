@@ -22,7 +22,6 @@ import { useStatusAdminStore } from '@/stores/statusAdmin'
 import { usePostureStore } from '@/stores/posture'
 import type { Alert } from '@/services/alertApi'
 import SparklineChart from '@/components/ui/SparklineChart.vue'
-import SlideOverPanel from '@/components/ui/SlideOverPanel.vue'
 import UpdateSummaryStrip from '@/components/dashboard/UpdateSummaryStrip.vue'
 import UpdateBadge from '@/components/UpdateBadge.vue'
 import { useUpdatesStore } from '@/stores/updates'
@@ -54,16 +53,20 @@ const postureStore = usePostureStore()
 
 const showPosture = computed(() => hasFeature('security_posture') && postureStore.posture !== null)
 
-const selectedService = ref<UnifiedMonitor | null>(null)
-const slideOpen = ref(false)
 const filterOpen = ref(false)
 const filterSearch = ref('')
 const filterType = ref<string>('')
 const filterIncidents = ref(false)
 
+const SLIDEOVER_TYPES = new Set(['container', 'heartbeat', 'certificate'])
+
 function selectService(monitor: UnifiedMonitor) {
-  selectedService.value = monitor
-  slideOpen.value = true
+  const numericId = Number(monitor.id.split(':')[1])
+  if (SLIDEOVER_TYPES.has(monitor.type) && numericId > 0) {
+    detailSlideOver.openDetail(monitor.type as EntityType, numericId)
+  } else {
+    router.push(monitor.link)
+  }
 }
 
 function clearFilters() {
@@ -753,66 +756,5 @@ onUnmounted(() => {
         </div>
       </div>
 
-    <!-- Slide-over detail panel -->
-    <SlideOverPanel v-model:open="slideOpen" :title="selectedService?.name || ''">
-      <template v-if="selectedService">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-          <div class="bg-[#0B0E13] p-4 rounded-xl border border-slate-800">
-            <p class="text-[10px] text-slate-500 font-bold uppercase mb-1.5 tracking-widest">Status</p>
-            <div class="flex items-center gap-2">
-              <div :class="['w-2.5 h-2.5 rounded-full', statusDotClass(selectedService.status)]" />
-              <p class="text-white font-semibold text-sm">{{ selectedService.statusLabel }}</p>
-            </div>
-          </div>
-          <div v-if="selectedService.metricValue" class="bg-[#0B0E13] p-4 rounded-xl border border-slate-800">
-            <p class="text-[10px] text-slate-500 font-bold uppercase mb-1.5 tracking-widest">{{ selectedService.metricLabel || 'Metric' }}</p>
-            <p class="text-white font-semibold text-sm font-mono">{{ selectedService.metricValue }}</p>
-          </div>
-        </div>
-
-        <div class="space-y-3 mb-6">
-          <div>
-            <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Details</h4>
-            <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800 space-y-2.5">
-              <div class="flex justify-between text-xs">
-                <span class="text-slate-500">Type</span>
-                <span class="text-slate-300 capitalize">{{ selectedService.type }}</span>
-              </div>
-              <div class="flex justify-between text-xs">
-                <span class="text-slate-500">Source</span>
-                <span class="text-slate-300 truncate ml-4 text-right">{{ selectedService.subtitle }}</span>
-              </div>
-              <div v-if="selectedService.group" class="flex justify-between text-xs">
-                <span class="text-slate-500">Group</span>
-                <span class="text-slate-300">{{ selectedService.group }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="selectedService.sparklineData && selectedService.sparklineData.length > 1" class="mb-6">
-          <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Trend</h4>
-          <div class="bg-[#0B0E13] rounded-xl p-4 border border-slate-800">
-            <SparklineChart
-              :data="selectedService.sparklineData"
-              :width="320"
-              :height="64"
-              color="#3b82f6"
-              :fill-opacity="0.12"
-            />
-          </div>
-        </div>
-
-        <div class="pt-5 border-t border-slate-800 flex gap-3">
-          <RouterLink
-            :to="selectedService.link"
-            class="flex-1 py-2.5 bg-pb-green-600 hover:bg-pb-green-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg text-center"
-            @click="slideOpen = false"
-          >
-            View details
-          </RouterLink>
-        </div>
-      </template>
-    </SlideOverPanel>
   </div>
 </template>

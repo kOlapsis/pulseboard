@@ -79,7 +79,7 @@ const mainNav = computed(() => allNav.filter(item => !item.feature || hasFeature
       <div class="flex flex-col flex-1 overflow-y-auto">
         <!-- Logo -->
         <div class="p-6 flex items-center gap-3 shrink-0">
-          <img src="/logo.svg" alt="maintenant" />
+          <img src="/icon.svg" alt="maintenant" />
         </div>
 
         <!-- Main nav -->
@@ -178,7 +178,7 @@ const mainNav = computed(() => allNav.filter(item => !item.feature || hasFeature
         class="md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#12151C] border-r border-slate-800 flex flex-col"
       >
         <div class="p-6 flex items-center gap-3">
-          <img src="/logo.svg" alt="maintenant" class="w-8 h-8 rounded-lg" />
+          <img src="/icon.svg" alt="maintenant" class="w-8 h-8 rounded-lg" />
           <h1 class="text-xl font-bold tracking-tight text-white">maintenant</h1>
         </div>
         <nav class="flex-1 px-4 space-y-0.5 overflow-y-auto pb-4">
