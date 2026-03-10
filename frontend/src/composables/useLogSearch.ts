@@ -79,7 +79,7 @@ export function useLogSearch(lines: Ref<LogLine[]>): UseLogSearchReturn {
         const line = lines.value[i]!
         re.lastIndex = 0
         let m: RegExpExecArray | null
-        while ((m = re.exec(line.raw)) !== null) {
+        while ((m = re.exec(line.text)) !== null) {
           if (m[0].length === 0) {
             re.lastIndex++
             continue
@@ -97,7 +97,7 @@ export function useLogSearch(lines: Ref<LogLine[]>): UseLogSearchReturn {
 
       for (let i = 0; i < lines.value.length; i++) {
         const line = lines.value[i]!
-        const haystack = isCaseSensitive.value ? line.raw : line.raw.toLowerCase()
+        const haystack = isCaseSensitive.value ? line.text : line.text.toLowerCase()
         let pos = 0
         while (pos < haystack.length) {
           const idx = haystack.indexOf(searchTerm, pos)

@@ -112,12 +112,12 @@ const renderSegments = computed<RenderSegment[]>(() => {
     }))
   }
 
-  // Build character-level highlight map from matches
-  const rawLen = props.line.raw.length
-  const highlightMap = new Uint8Array(rawLen) // 0=none, 1=match, 2=current
+  // Build character-level highlight map from matches (on plain text positions)
+  const textLen = props.line.text.length
+  const highlightMap = new Uint8Array(textLen) // 0=none, 1=match, 2=current
   for (const m of lineMatches) {
     const isCurrent = m.startOffset === props.activeMatchOffset
-    for (let i = m.startOffset; i < m.endOffset && i < rawLen; i++) {
+    for (let i = m.startOffset; i < m.endOffset && i < textLen; i++) {
       highlightMap[i] = isCurrent ? 2 : Math.max(highlightMap[i]!, 1)
     }
   }
@@ -184,7 +184,7 @@ const renderSegments = computed<RenderSegment[]>(() => {
     <span class="flex-1">
       <!-- JSON rendering -->
       <LogJsonLine
-        v-if="line.parsedJson"
+        v-if="line.parsedJson && searchMatches.length === 0"
         :json="line.parsedJson"
         :prefix="line.jsonPrefix"
         :expanded="expanded"
